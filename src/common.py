@@ -51,12 +51,37 @@ def extract_json(text):
     return json.loads(text[s:e + 1])
 
 
-def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9, tries=5):
-    model = cfg()["gemini_model"]
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+_MODELS = None
+
+
+def _model_list(key):
+    """Configured model first, then every Flash model the API currently offers (newest first)."""
+    global _MODELS
+    if _MODELS:
+        return _MODELS
+    c = cfg()
+    found = []
+    try:
+        r = requests.get("https://generativelanguage.googleapis.com/v1beta/models",
+                         params={"key": key, "pageSize": 1000}, timeout=30)
+        for m in r.json().get("models", []):
+            name = m["name"].split("/")[-1]
+            mm = re.fullmatch(r"gemini-(\d+(?:\.\d+)?)-flash(-lite)?(-preview)?", name)
+            if mm and "generateContent" in m.get("supportedGenerationMethods", []):
+                found.append((-float(mm.group(1)), bool(mm.group(2)), bool(mm.group(3)), name))
+        found.sort()
+    except Exception as e:
+        print("model discovery failed:", e)
+    order = [c["gemini_model"]] + [f[3] for f in found] + list(c.get("gemini_fallbacks", [])) + ["gemini-flash-latest"]
+    _MODELS = list(dict.fromkeys(order))
+    print("Gemini models to try:", _MODELS[:6])
+    return _MODELS
+
+
+def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9, tries=16):
     body = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": temperature, "maxOutputTokens": 32000},
+        "generationConfig": {"maxOutputTokens": 32000},
     }
     if system:
         body["systemInstruction"] = {"parts": [{"text": system}]}
@@ -68,18 +93,28 @@ def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
                         env("GEMINI_API_KEY_3", False)) if k]
     if not keys:
         raise RuntimeError("No GEMINI_API_KEY set")
-    last = ""
-    for i in range(tries):
+    models = _model_list(keys[0])
+    last, mi = "", 0
+    for n in range(tries):
+        model = models[mi % len(models)]
+        gc = dict(body["generationConfig"])
+        if not model.startswith("gemini-3"):      # Gemini 3 works best at its default temperature
+            gc["temperature"] = temperature
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         try:
-            r = requests.post(url, params={"key": keys[i % len(keys)]}, json=body, timeout=300)
+            r = requests.post(url, params={"key": keys[n % len(keys)]}, json=dict(body, generationConfig=gc), timeout=300)
             if r.status_code == 200:
                 parts = r.json()["candidates"][0]["content"]["parts"]
-                text = "".join(p.get("text", "") for p in parts)
+                text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
                 return extract_json(text) if json_out else text
-            last = f"{r.status_code} {r.text[:200]}"
-        except Exception as ex:  # parse errors, timeouts
+            last = f"{model}: {r.status_code} {r.text[:200]}"
+            mi += 1                                  # any API error -> try the next model (and next key)
+            print("Gemini error, switching:", last[:120])
+            if r.status_code in (404, 400):
+                continue                             # model gone/incompatible: no waiting needed
+        except Exception as ex:  # parse errors, timeouts: retry same model
             last = repr(ex)
-        time.sleep(12 * (i + 1))
+        time.sleep(min(6 * (n + 1), 45))
     raise RuntimeError(f"Gemini failed: {last}")
 
 
