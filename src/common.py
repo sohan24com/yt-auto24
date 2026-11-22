@@ -64,10 +64,14 @@ def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
         body["tools"] = [{"google_search": {}}]   # cannot be combined with JSON mime type
     elif json_out:
         body["generationConfig"]["responseMimeType"] = "application/json"
+    keys = [k for k in (env("GEMINI_API_KEY", False), env("GEMINI_API_KEY_2", False),
+                        env("GEMINI_API_KEY_3", False)) if k]
+    if not keys:
+        raise RuntimeError("No GEMINI_API_KEY set")
     last = ""
     for i in range(tries):
         try:
-            r = requests.post(url, params={"key": env("GEMINI_API_KEY")}, json=body, timeout=300)
+            r = requests.post(url, params={"key": keys[i % len(keys)]}, json=body, timeout=300)
             if r.status_code == 200:
                 parts = r.json()["candidates"][0]["content"]["parts"]
                 text = "".join(p.get("text", "") for p in parts)
