@@ -20,14 +20,9 @@ jobs:
       - name: Read analytics, swap weak thumbnails, update insights
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
-          GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
-          GEMINI_API_KEY_4: ${{ secrets.GEMINI_API_KEY_4 }}
-          GEMINI_API_KEYS: ${{ secrets.GEMINI_API_KEYS }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          GOOGLE_DRIVE_REFRESH_TOKEN: ${{ secrets.GOOGLE_DRIVE_REFRESH_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python -m src.analytics
@@ -36,4 +31,4 @@ jobs:
         run: |
           git config user.name "yt-bot"; git config user.email "bot@users.noreply.github.com"
           git add memory
-          git diff --cached --quiet || (git commit -m "memory: analytics" && git pull --rebase --autostash && git push)
+          git diff --cached --quiet || (git commit -m "memory: analytics" && git pull --rebase && git push)
