@@ -1,14 +1,15 @@
 # YT Documentary Bot (free, GitHub Actions)
 
 2 documentaries/day (8-10 min, English) for 30 days: topic -> script -> fact-check -> voice -> footage ->
-edit -> quality gate -> thumbnails -> Google Drive (auto-delete after 3 days) -> YouTube (+1 Short each) ->
+edit -> quality gate -> thumbnails -> Google Drive (auto-delete after 3 days) -> YouTube (+1 multi-highlight Short each) ->
 analytics loop that re-weights topics and swaps weak thumbnails/titles.
 
 ## Setup (about 45 minutes, once)
 
 1. **Repo**: create a new **public** GitHub repo, upload all these files. (Public = unlimited free Actions minutes.
-   Never commit keys; they go in Secrets only.)
-2. **Gemini key**: https://aistudio.google.com/apikey -> secret `GEMINI_API_KEY`.
+   Never commit keys; they go in Secrets/environment variables only.)
+2. **Gemini keys**: https://aistudio.google.com/apikey -> add your key(s) to secret `GEMINI_API_KEY` (or comma/newline-separated
+   keys in `GEMINI_API_KEYS` for automatic rotation and failover across keys on rate limits/errors).
 3. **Pexels key**: https://www.pexels.com/api/ -> secret `PEXELS_API_KEY`.
 4. **Google Cloud** (console.cloud.google.com), one project:
    - Enable: YouTube Data API v3, YouTube Analytics API, Google Drive API.
