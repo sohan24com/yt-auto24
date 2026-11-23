@@ -1,52 +1,134 @@
+import re
 from .common import cfg, gemini, load_insights
+
+BANNED_CLICHES = (
+    "in a world",
+    "little did they know",
+    "buckle up",
+    "let's dive in",
+    "lets dive in",
+)
 
 
 def words(scenes):
-    return sum(len(s["narration"].split()) for s in scenes)
+    return sum(len((s or {}).get("narration", "").split()) for s in (scenes or []))
+
+
+def _clean_visuals(raw_visuals, fallback_topic):
+    cleaned = []
+    seen = set()
+    for item in raw_visuals or []:
+        q = re.sub(r"[^A-Za-z0-9\s-]", " ", str(item or ""))
+        q = re.sub(r"\s+", " ", q).strip()
+        words_q = q.split()
+        if len(words_q) > 4:
+            q = " ".join(words_q[:4])
+        key = q.lower()
+        if q and len(q.split()) >= 2 and key not in seen:
+            seen.add(key)
+            cleaned.append(q)
+        if len(cleaned) >= 4:
+            break
+
+    base_fallbacks = [
+        f"{fallback_topic} wide shot",
+        "historical archive map",
+        "night sky stars",
+        "dramatic landscape view",
+    ]
+    for fb in base_fallbacks:
+        if len(cleaned) >= 4:
+            break
+        q = re.sub(r"\s+", " ", re.sub(r"[^A-Za-z0-9\s-]", " ", fb)).strip()
+        q = " ".join(q.split()[:4])
+        if q and q.lower() not in seen:
+            seen.add(q.lower())
+            cleaned.append(q)
+    return cleaned[:4]
+
+
+def _normalize_script(data, topic):
+    if not isinstance(data, dict):
+        return data
+    scenes = data.get("scenes")
+    if not isinstance(scenes, list):
+        return data
+    topic_label = str((topic or {}).get("topic") or "documentary").strip()
+    norm_scenes = []
+    for idx, sc in enumerate(scenes):
+        if not isinstance(sc, dict):
+            continue
+        title = re.sub(r"\s+", " ", str(sc.get("title") or f"Part {idx + 1}")).strip()
+        narration = re.sub(r"\s+", " ", str(sc.get("narration") or "")).strip()
+        visuals = _clean_visuals(sc.get("visuals"), topic_label)
+        norm_scenes.append({
+            "title": title,
+            "narration": narration,
+            "visuals": visuals,
+        })
+    data["scenes"] = norm_scenes
+    if not isinstance(data.get("sources"), list):
+        data["sources"] = []
+    return data
 
 
 def write_script(topic):
     c = cfg()
     v = c["video"]
-    lessons = "\n".join("- " + l for l in load_insights().get("lessons", []))
-    prompt = f"""Write the narration for a documentary video of 8-10 minutes.
+    lessons = "\n".join("- " + str(l) for l in (load_insights() or {}).get("lessons", []))
+    prompt = f"""Write the narration for a #1 retention documentary video of 8-10 minutes.
 Channel tone: {c['channel']['tone']}.
 Topic: {topic['topic']}
 Angle: {topic['angle']}
 
 STRUCTURE
-- Scene 1 is the HOOK (max 90 words): open with a startling, TRUE, specific fact or question. No greeting,
-  no "welcome", no channel intro. Promise what the viewer will learn by the end.
-- Then 10-12 more scenes. Every second scene must end with an OPEN LOOP (a question answered later).
-- Final scene: the payoff, a thought-provoking close, one short line inviting viewers to subscribe for the next story.
+- Scene 1 is the HOOK (max 85 words): open in the VERY FIRST sentence with a startling, TRUE,
+  specific fact, paradox, or sharp question. No greeting, no "welcome", no channel intro.
+  State clearly what mystery or truth will be uncovered by the end.
+- Then 10-12 more scenes. Every second scene must end with a clear OPEN LOOP (a specific question or
+  tension that is answered later in the video). Every 2-3 scenes should also deliver a concrete insight
+  or micro-payoff so mid-video retention stays high.
+- Final scene: deliver the main payoff, close every open loop, end with a memorable thought-provoking
+  line, and add one short line inviting viewers to subscribe for the next story.
 STYLE
-- Concrete details (dates, places, numbers), short sentences mixed with long ones, plain words.
+- Written to be spoken aloud naturally via TTS: concrete details (dates, places, numbers), varied
+  sentence lengths (short punchy lines mixed with clear explanations), plain everyday words.
+- Avoid repeating the same point across adjacent scenes; each scene must advance the story.
 - Banned cliches: "in a world", "little did they know", "buckle up", "let's dive in".
 - Total narration {v['words_min']}-{v['words_max']} words. Spoken text only (no stage directions, no markdown).
 HONESTY
-- Separate documented facts from theories ("historians believe", "according to ...").
-- Never invent quotes, statistics, names or sources.
+- Strictly separate documented facts from theories ("historians believe", "according to ...", "researchers suggest").
+- Never invent quotes, statistics, names, or sources.
 VISUALS
-- For each scene give 4 stock-footage search queries: concrete visual nouns, 2-4 words, generic enough to
-  exist on Pexels (e.g. "ancient stone ruins", "foggy forest drone", "old handwritten manuscript"). No people's names.
-Lessons from our analytics (apply them):
+- For each scene give 4 stock-footage search queries: concrete visual nouns/scenes, 2-4 words each,
+  landscape-friendly and easy to find on Pixabay, Wikimedia Commons, or NASA
+  (e.g. "ancient stone ruins", "foggy forest aerial", "old handwritten map", "earth orbit night").
+  Vary angles/subjects across the 4 queries and include no people's names.
+Lessons from our analytics (apply them to hook, pacing, and framing):
 {lessons or '- none yet'}
 Return JSON: {{"scenes":[{{"title":"short chapter title","narration":"","visuals":["","","",""]}}],"sources":["real reference works/institutions"]}}"""
-    return gemini(prompt, temperature=0.85)
+    raw = gemini(prompt, temperature=0.85)
+    return _normalize_script(raw, topic)
 
 
 def fact_check(script):
     prompt = f"""You are a strict documentary fact-checker. Use Google Search to verify every factual claim
-(dates, names, numbers, causes) in this script. Fix errors. Remove or hedge anything you cannot verify.
-Keep the same structure, tone and length (within 10%). Keep every scene's "visuals" unchanged.
+(dates, names, numbers, causes) in this script. Fix errors. Remove or hedge anything you cannot verify
+so documented facts and theories/speculation stay clearly separated.
+Keep the same structure, tone, and length (within 10%). Keep every scene's "title" and "visuals" intact
+unless a title is factually wrong.
 Return ONLY JSON: {{"scenes":[...same format...],"sources":["urls or publication names actually used"],"changes":["what you changed"]}}
 
 SCRIPT:
 {script}"""
     try:
         out = gemini(prompt, grounding=True, temperature=0.2)
-        if out.get("scenes") and len(out["scenes"]) >= 8:
-            return out
+        if isinstance(out, dict) and out.get("scenes") and len(out["scenes"]) >= 8:
+            orig_scenes = script.get("scenes", []) if isinstance(script, dict) else []
+            for i, sc in enumerate(out["scenes"]):
+                if isinstance(sc, dict) and not sc.get("visuals") and i < len(orig_scenes):
+                    sc["visuals"] = orig_scenes[i].get("visuals", [])
+            return _normalize_script(out, {"topic": ""})
     except Exception as e:
         print("fact_check failed, keeping original:", e)
     return script
@@ -54,15 +136,20 @@ SCRIPT:
 
 def valid(script):
     v = cfg()["video"]
-    sc = script.get("scenes", [])
+    sc = (script or {}).get("scenes", [])
     w = words(sc) if sc else 0
     problems = []
     if len(sc) < 8:
         problems.append("too few scenes")
     if not (v["words_min"] * 0.9 <= w <= v["words_max"] * 1.1):
         problems.append(f"word count {w}")
-    if sc and len(sc[0]["narration"].split()) > 120:
+    if sc and len(sc[0].get("narration", "").split()) > 120:
         problems.append("hook too long")
+    full_text = " ".join(s.get("narration", "").lower() for s in sc)
+    if any(cliche in full_text for cliche in BANNED_CLICHES):
+        problems.append("banned cliche")
+    if sc and any(not s.get("narration", "").strip() for s in sc):
+        problems.append("empty narration")
     return problems
 
 
@@ -78,13 +165,36 @@ Topic: {topic['topic']} | Angle: {topic['angle']} | Chapters: {outline}
    without spoiling the payoff. Do NOT include chapters or sources, I add them.
 4) 12 tags.
 Return JSON: {{"titles":[{{"title":"","curiosity":0,"clarity":0,"honesty":0}}],"thumb_texts":["","",""],"description":"","tags":[""]}}"""
-    m = gemini(prompt)
-    titles = sorted(m["titles"], key=lambda t: t["curiosity"] + t["clarity"] + 2 * t["honesty"], reverse=True)
-    src = "\n".join("- " + s for s in sources[:8])
-    desc = (f"{m['description']}\n\nCHAPTERS\n{chapters}\n\nSOURCES\n{src}\n\n"
-            f"FOOTAGE: {credits}\nNarration is AI-generated; research assisted by AI and fact-checked against web sources.")
+    m = gemini(prompt) or {}
+    raw_titles = m.get("titles") or []
+    if raw_titles:
+        titles = sorted(
+            [t for t in raw_titles if isinstance(t, dict)],
+            key=lambda t: float(t.get("curiosity", 0)) + float(t.get("clarity", 0)) + 2 * float(t.get("honesty", 0)),
+            reverse=True,
+        )
+        t_primary = str((titles[0] if titles else {}).get("title") or topic["topic"])[:100]
+        t_secondary = str((titles[1] if len(titles) > 1 else (titles[0] if titles else {})).get("title") or t_primary)[:100]
+    else:
+        t_primary = t_secondary = str(topic["topic"])[:100]
+
+    thumbs = [str(x).strip() for x in (m.get("thumb_texts") or []) if str(x).strip()]
+    if not thumbs:
+        thumbs = [str(topic["topic"]).upper()[:28]]
+    thumbs = (thumbs + thumbs)[:3]
+
+    desc_body = str(m.get("description") or "").strip()
+    src = "\n".join("- " + str(s) for s in (sources or [])[:8])
+    desc = (
+        f"{desc_body}\n\nCHAPTERS\n{chapters}\n\nSOURCES\n{src}\n\n"
+        f"FOOTAGE: {credits}\nNarration is AI-generated; research assisted by AI and fact-checked against web sources."
+    )
+    tags = [str(x).strip() for x in (m.get("tags") or []) if str(x).strip()][:15]
+
     return {
-        "title": titles[0]["title"][:100], "title_b": (titles[1] if len(titles) > 1 else titles[0])["title"][:100],
-        "thumb_texts": (m["thumb_texts"] + m["thumb_texts"])[:3], "description": desc,
-        "tags": m["tags"][:15],
+        "title": t_primary,
+        "title_b": t_secondary,
+        "thumb_texts": thumbs,
+        "description": desc,
+        "tags": tags,
     }
