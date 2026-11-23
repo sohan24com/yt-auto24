@@ -9,7 +9,7 @@ videos_per_day: 2
 # starting mix; analytics.py shifts it toward what actually performs
 category_mix: {mystery: 0.7, history: 0.2, science: 0.1}
 
-gemini_model: "gemini-2.5-flash"
+gemini_model: "gemini-3.8-flash"
 
 video:
   words_min: 1150
