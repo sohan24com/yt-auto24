@@ -1,4 +1,4 @@
-channel:
+Channel:
   niche: "Unsolved mysteries, hidden history and mind-bending science"
   tone: "cinematic, calm, curious, authoritative - like a premium streaming documentary"
   default_language: "en"
@@ -14,7 +14,15 @@ category_mix:
   history: 0.2
   science: 0.1
 
-gemini_model: "gemini-2.5-flash"
+gemini_model: "gemini-3.8-flash"
+gemini_fallback_models:
+  - "gemini-3.6-flash"
+  - "gemini-3.5-flash-lite"
+  - "gemini-3.1-flash-lite"
+  - "gemini-4-hydrogen"
+  - "gemini-4-argon"
+  - "gemini-4-carbon"
+  - "gemini-4-neon"
 
 video:
   words_min: 1150
