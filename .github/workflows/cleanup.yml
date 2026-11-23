@@ -3,6 +3,9 @@ on:
   schedule:
     - cron: "0 3 * * *"
   workflow_dispatch:
+concurrency:
+  group: drive-cleanup
+  cancel-in-progress: false
 jobs:
   clean:
     runs-on: ubuntu-latest
