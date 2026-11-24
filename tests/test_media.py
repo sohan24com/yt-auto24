@@ -71,6 +71,73 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(["gemini-3.6-flash", "gemini-2.5-flash-lite"], models)
         common._MODELS = None
 
+    def test_gemini_falls_back_to_groq_after_all_gemini_keys_fail(self):
+        gemini_quota = self._gemini_response(429, text="quota")
+        groq_rejected = self._gemini_response(401, text="invalid key")
+        groq_success = SimpleNamespace(
+            status_code=200,
+            json=lambda: {"choices": [{"message": {"content": '{"ok": true}'}}]},
+        )
+        with (
+            self._gemini_test_env(),
+            patch.dict(os.environ, {
+                "GROQ_API_KEY": "groq-key-1",
+                "GROQ_API_KEY_2": "groq-key-2",
+            }, clear=False),
+            patch("src.common._model_list", return_value=["gemini-model"]),
+            patch("src.common.requests.post", side_effect=[
+                gemini_quota, gemini_quota, groq_rejected, groq_success,
+            ]) as post,
+        ):
+            result = common.gemini("test prompt", request_timeout=1, total_timeout=5)
+        self.assertEqual({"ok": True}, result)
+        self.assertEqual("https://api.groq.com/openai/v1/chat/completions",
+                         post.call_args.args[0])
+        self.assertEqual("Bearer groq-key-2", post.call_args.kwargs["headers"]["Authorization"])
+        self.assertEqual({"type": "json_object"},
+                         post.call_args.kwargs["json"]["response_format"])
+
+    def test_groq_429_moves_to_another_model_not_another_same_org_key(self):
+        groq_quota = self._gemini_response(429, text="rate limit")
+        groq_success = SimpleNamespace(
+            status_code=200,
+            json=lambda: {"choices": [{"message": {"content": '{"ok": true}'}}]},
+        )
+        with (
+            self._gemini_test_env(),
+            patch.dict(os.environ, {
+                "GROQ_API_KEY": "groq-key-1",
+                "GROQ_API_KEY_2": "groq-key-2",
+            }, clear=False),
+            patch("src.common._model_list", return_value=["gemini-model"]),
+            patch("src.common.requests.post", side_effect=[
+                self._gemini_response(429, text="quota"),
+                self._gemini_response(429, text="quota"),
+                groq_quota, groq_success,
+            ]) as post,
+        ):
+            result = common.gemini("test prompt", request_timeout=1, total_timeout=5)
+        self.assertEqual({"ok": True}, result)
+        groq_calls = [call for call in post.call_args_list
+                      if call.args[0] == "https://api.groq.com/openai/v1/chat/completions"]
+        self.assertEqual(2, len(groq_calls))
+        self.assertEqual("Bearer groq-key-1", groq_calls[0].kwargs["headers"]["Authorization"])
+        self.assertEqual("Bearer groq-key-1", groq_calls[1].kwargs["headers"]["Authorization"])
+        self.assertNotEqual(groq_calls[0].kwargs["json"]["model"],
+                            groq_calls[1].kwargs["json"]["model"])
+
+    def test_grounded_gemini_failure_does_not_call_groq(self):
+        with (
+            self._gemini_test_env(),
+            patch.dict(os.environ, {"GROQ_API_KEY": "groq-key-1"}, clear=False),
+            patch("src.common._model_list", return_value=["gemini-model"]),
+            patch("src.common.requests.post", return_value=self._gemini_response(400)),
+            patch("src.common._groq") as groq,
+        ):
+            with self.assertRaises(common.GeminiUnavailableError):
+                common.gemini("fact check", grounding=True, request_timeout=1, total_timeout=5)
+        groq.assert_not_called()
+
     def test_gemini_rotates_to_next_key_on_quota(self):
         success = {"candidates": [{"content": {"parts": [{"text": '{"ok": true}'}]}}]}
         with self._gemini_test_env(), \

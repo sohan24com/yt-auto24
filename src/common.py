@@ -92,7 +92,7 @@ class GeminiUnavailableError(RuntimeError):
     """Raised after bounded attempts across the configured Gemini keys and models."""
 
 
-def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
+def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
            tries=None, request_timeout=90, total_timeout=300):
     body = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
@@ -184,6 +184,180 @@ def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
     raise GeminiUnavailableError(
         f"Gemini unavailable after {attempts} bounded attempt(s) ({summary}); last response: {last}"
     )
+
+
+GROQ_MODELS = (
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.8-27b",
+)
+
+
+class GroqUnavailableError(RuntimeError):
+    """Raised after bounded attempts across configured Groq API keys and models."""
+
+
+def _groq(prompt, system=None, json_out=True, temperature=0.9,
+          request_timeout=20, total_timeout=90):
+    keys = list(dict.fromkeys(k.strip() for k in (
+        env("GROQ_API_KEY", False), env("GROQ_API_KEY_2", False),
+    ) if k and k.strip()))
+    if not keys:
+        raise GroqUnavailableError("No Groq API keys are configured")
+
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
+    deadline = time.monotonic() + max(1.0, float(total_timeout))
+    attempts = 0
+    status_counts = {}
+    last = "no usable response"
+
+    for model in GROQ_MODELS:
+        for key in keys:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            attempts += 1
+            payload = {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_completion_tokens": 4096,
+            }
+            if json_out:
+                payload["response_format"] = {"type": "json_object"}
+            try:
+                response = requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {key}",
+                             "Content-Type": "application/json"},
+                    json=payload,
+                    timeout=min(float(request_timeout), remaining),
+                )
+                if response.status_code == 200:
+                    content = response.json()["choices"][0]["message"].get("content") or ""
+                    if not content.strip():
+                        last = f"{model}: empty response"
+                        continue
+                    return extract_json(content) if json_out else content
+
+                status = int(response.status_code)
+                status_counts[status] = status_counts.get(status, 0) + 1
+                last = f"{model}: HTTP {status}"
+                print(f"Groq candidate unavailable: {model} HTTP {status}")
+                if status in (401, 403):
+                    # Rotate a rejected credential; do not log or expose its value.
+                    continue
+                # A 429/capacity error moves to another model without replaying the
+                # same organization's shared quota through another key.
+                break
+            except requests.Timeout:
+                last = f"{model}: request timed out"
+                continue
+            except Exception as ex:
+                last = f"{model}: {type(ex).__name__}"
+                continue
+
+        if deadline - time.monotonic() <= 0:
+            break
+
+    summary = ", ".join(f"HTTP {code} x{count}" for code, count in sorted(status_counts.items()))
+    if not summary:
+        summary = f"{attempts} request attempt(s)"
+    raise GroqUnavailableError(
+        f"Groq unavailable after {attempts} bounded attempt(s) ({summary}); last response: {last}"
+    )
+
+
+
+class CloudflareUnavailableError(RuntimeError):
+    """Raised when the optional Cloudflare Workers AI fallback cannot answer."""
+
+
+def _cloudflare(prompt, system=None, json_out=True, temperature=0.9,
+                request_timeout=30):
+    """Call one bounded Workers AI text model; never log credentials or response bodies."""
+    token = env("CLOUDFLARE_API_TOKEN", False).strip()
+    account_id = env("CLOUDFLARE_ACCOUNT_ID", False).strip()
+    if not token or not account_id:
+        raise CloudflareUnavailableError("Cloudflare credentials are not configured")
+
+    messages = []
+    if system:
+        instruction = system
+        if json_out:
+            instruction += "\nReturn valid JSON only, with no Markdown fences or extra text."
+        messages.append({"role": "system", "content": instruction})
+    user_prompt = prompt
+    if json_out and not system:
+        user_prompt += "\nReturn valid JSON only, with no Markdown fences or extra text."
+    messages.append({"role": "user", "content": user_prompt})
+
+    url = (f"https://api.cloudflare.com/client/v4/accounts/{account_id}"
+           "/ai/v1/chat/completions")
+    try:
+        response = requests.post(
+            url,
+            headers={"Authorization": f"Bearer {token}",
+                     "Content-Type": "application/json"},
+            json={"model": "@cf/meta/llama-3.1-8b-instruct",
+                  "messages": messages, "temperature": temperature,
+                  "max_tokens": 4096},
+            timeout=float(request_timeout),
+        )
+        if response.status_code != 200:
+            print(f"Cloudflare candidate unavailable: HTTP {response.status_code}")
+            raise CloudflareUnavailableError(
+                f"Cloudflare Workers AI returned HTTP {response.status_code}"
+            )
+        content = (response.json().get("choices", [{}])[0]
+                   .get("message", {}).get("content") or "")
+        if not content.strip():
+            raise CloudflareUnavailableError("Cloudflare returned an empty response")
+        return extract_json(content) if json_out else content
+    except CloudflareUnavailableError:
+        raise
+    except requests.Timeout as exc:
+        raise CloudflareUnavailableError("Cloudflare request timed out") from exc
+    except Exception as exc:
+        raise CloudflareUnavailableError(
+            f"Cloudflare request failed: {type(exc).__name__}"
+        ) from exc
+
+def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
+           tries=None, request_timeout=90, total_timeout=300):
+    """Use Gemini first; Groq then Cloudflare are optional ungrounded text fallbacks."""
+    try:
+        return _gemini(
+            prompt, system=system, grounding=grounding, json_out=json_out,
+            temperature=temperature, tries=tries,
+            request_timeout=request_timeout, total_timeout=total_timeout,
+        )
+    except GeminiUnavailableError as gemini_error:
+        # Do not replace a Google Search grounded fact-check with an ungrounded answer.
+        if grounding:
+            raise
+        groq_error = None
+        try:
+            return _groq(prompt, system=system, json_out=json_out, temperature=temperature)
+        except GroqUnavailableError as exc:
+            groq_error = exc
+        try:
+            print("Groq unavailable; trying Cloudflare Workers AI")
+            return _cloudflare(
+                prompt, system=system, json_out=json_out, temperature=temperature
+            )
+        except CloudflareUnavailableError as cloudflare_error:
+            if (str(groq_error) == "No Groq API keys are configured"
+                    and str(cloudflare_error) == "Cloudflare credentials are not configured"):
+                raise gemini_error
+            raise GeminiUnavailableError(
+                f"{gemini_error}; Groq fallback failed: {groq_error}; "
+                f"Cloudflare fallback failed: {cloudflare_error}"
+            ) from cloudflare_error
 
 
 # ---------- notifications ----------

@@ -14,8 +14,14 @@ uploads media that fails the media probes.
    The code tries configured keys across Gemini requests; Gemini TTS also moves to the next key after a failure.
    Add keys from separate Google Cloud projects if you need separate project quotas; multiple keys in one
    project generally share that project's quota.
-3. **Pexels key**: https://www.pexels.com/api/ -> secret `PEXELS_API_KEY`.
-4. **Google Cloud** (console.cloud.google.com), one project:
+3. **Optional text fallbacks**: add `GROQ_API_KEY` and `GROQ_API_KEY_2` for Groq, plus
+   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` for Cloudflare Workers AI. The order is Gemini,
+   Groq, then Cloudflare for ordinary text/JSON generation. Google Search grounded fact-check remains
+   Gemini-only and keeps its existing safe behavior if Gemini is unavailable. Groq keys in one organization
+   share quota. Cloudflare Workers AI has a daily free allocation; requests can fail after it is exhausted.
+   Create the token from Workers AI → Use REST API and keep both values only in Actions secrets.
+4. **Pexels key**: https://www.pexels.com/api/ -> secret `PEXELS_API_KEY`.
+5. **Google Cloud** (console.cloud.google.com), one project:
    - Enable: YouTube Data API v3, YouTube Analytics API, Google Drive API.
    - OAuth consent screen: External. **Publish it ("In production")**. In "Testing" mode the refresh token
      dies after 7 days and the whole system stops.
@@ -26,11 +32,11 @@ uploads media that fails the media probes.
      and `get_tokens.py drive`). The existing YouTube token keeps upload and analytics working. To enable the optional
      Shorts link comment, regenerate `GOOGLE_REFRESH_TOKEN` with `python get_tokens.py youtube` and update that
      GitHub Actions secret. The new token is saved locally in an ignored file; the helper does not print its value.
-5. **Optional** Telegram alerts: secrets `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
-6. **Optional music**: add only tracks you have rights to use under `assets/music/`. Name tracks with a mood word
+6. **Optional** Telegram alerts: secrets `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+7. **Optional music**: add only tracks you have rights to use under `assets/music/`. Name tracks with a mood word
    such as `suspense_01.mp3`, `tension_01.mp3`, `emotional_01.mp3`, `wonder_01.mp3`, or `neutral_01.mp3`.
    The editor matches those tracks to scene emotion and synthesizes a free ambient bed for moods with no matching file.
-7. Edit `config.yaml` -> `start_date` (day 1). Then Actions tab -> **generate-video -> Run workflow**
+8. Edit `config.yaml` -> `start_date` (day 1). Then Actions tab -> **generate-video -> Run workflow**
    with force = 1 for a first test. Check the video before trusting the schedule.
 
 Schedule: `generate.yml` runs 05:30 and 13:30 UTC (edit the cron), `analytics.yml` every 12 h,
