@@ -27,20 +27,24 @@ class PipelineTests(unittest.TestCase):
         self.temp.cleanup()
 
     def test_ffprobe_accepts_complete_landscape_and_rejects_wrong_duration(self):
-        self.assertEqual([], pipeline.media_problems(self.source, expected_duration=4.0))
-        errors = pipeline.media_problems(self.source, expected_duration=9.0)
+        self.assertEqual([], pipeline.media_problems(
+            self.source, expected_duration=4.0, min_bytes=0))
+        errors = pipeline.media_problems(
+            self.source, expected_duration=9.0, min_bytes=0)
         self.assertTrue(any("duration" in error for error in errors))
 
     def test_short_is_portrait_and_within_duration(self):
         short = self.wd / "short.mp4"
         shorts.make_short(self.source, 0.5, 2.5, short)
-        self.assertEqual([], pipeline.media_problems(short, expected_duration=2.5, portrait=True))
+        self.assertEqual([], pipeline.media_problems(
+            short, expected_duration=2.5, portrait=True, min_bytes=0))
 
     def test_short_picker_uses_nonfinal_scene(self):
         scenes = [
             {"title": "Opening", "narration": "A quiet setup with enough words to qualify for a short scene."},
             {"title": "The clue", "emotion": "suspenseful",
-             "narration": "But why did the machine stop? The answer hides in a date from 1200 years ago."},
+             "narration": ("But why did the machine stop? The answer hides in a date from 1200 years ago. "
+                           "Researchers found a clue that changed what we understood about this ancient device.")},
             {"title": "Final answer", "narration": "The final answer explains everything."},
         ]
         start, duration, index = shorts.choose_moment(scenes, [0, 20, 70], [20, 50, 15], 40)
@@ -95,7 +99,8 @@ class PipelineTests(unittest.TestCase):
         edit.make_ass(scenes, [5.0], ass, "THE LOST CLUE",
                       shot_labels=[(0.0, 5.0, "ARCHIVAL CLIP • INTERNET ARCHIVE")])
         text = ass.read_text(encoding="utf-8")
-        self.assertIn("THE LOST CLUE", text)
+        normalized = text.replace(r"\\N", " ")
+        self.assertIn("THE LOST CLUE", normalized)
         self.assertIn("ARCHIVAL CLIP", text)
 
 
