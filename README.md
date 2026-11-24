@@ -18,8 +18,8 @@ uploads media that fails the media probes.
    `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` for Cloudflare Workers AI, and
    `OPENROUTER_API_KEY` for OpenRouter. Ordinary text/JSON generation tries Gemini, Groq, Cloudflare,
    then OpenRouter's `openrouter/free` router only; it never selects a paid OpenRouter model. The free
-   router is rate limited (currently 50 requests/day); provider availability can still vary. Google Search
-   grounded fact-check remains Gemini-only and keeps its existing safe behavior if Gemini is unavailable.
+   router is rate limited (currently 50 requests/day); provider availability can still vary. Grounded fact-check tries Gemini Search first, then Groq's required browser_search tool. If both are unavailable,
+   it keeps the original script and does not claim the check succeeded.
    Groq keys in one organization share quota. Cloudflare also has a daily free allocation.
    Keep all credentials only in Actions secrets. Cohere trial keys are not used by this production workflow:
    Cohere says trial keys are not permitted for production or commercial use; a production key is paid.
@@ -58,7 +58,7 @@ Schedule: `generate.yml` runs 05:30 and 13:30 UTC (edit the cron), `analytics.ym
 - **Quotas**: 2 videos + 2 Shorts = ~6,400 of 10,000 daily API units.
 - **Fact-check** uses Gemini with Google Search grounding. It reduces errors, it does not eliminate them.
   Review the first videos by hand, especially for the "mystery" category.
-- **edge-tts** calls Microsoft's online voices; if they ever block GitHub IPs, swap `voice.py` for another TTS.
+- Voice fallback order is Gemini TTS → Edge TTS → offline `espeak-ng`. The last option is less natural, but it does not need a third-party TTS service or API key.
 - Footage results are matched to narration terms. Pexels/Pixabay are labeled illustrative; Wikimedia reference
   images and Internet Archive clips carry source labels. When nothing relevant is available, the video shows a
   generated context card instead of unrelated stock.
