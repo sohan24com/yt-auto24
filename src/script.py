@@ -5,10 +5,11 @@ def words(scenes):
     return sum(len(s["narration"].split()) for s in scenes)
 
 
-def write_script(topic):
+def write_script(topic, validation_feedback=None):
     c = cfg()
     v = c["video"]
-    lessons = "\n".join("- " + l for l in load_insights().get("lessons", []))
+    lessons = "\\n".join("- " + l for l in load_insights().get("lessons", []))
+    feedback = "\\n".join("- " + str(p) for p in (validation_feedback or [])) or "- none"
     prompt = f"""Write the narration for a documentary video of 8-10 minutes.
 Channel tone: {c['channel']['tone']}.
 Topic: {topic['topic']}
@@ -30,6 +31,8 @@ STYLE
 - Concrete details (dates, places, numbers), short sentences mixed with long ones, plain words.
 - Banned cliches: "in a world", "little did they know", "buckle up", "let's dive in".
 - Total narration {v['words_min']}-{v['words_max']} words. Spoken text only (no stage directions, no markdown).
+VALIDATION FEEDBACK FROM THE PREVIOUS DRAFT (correct each item):
+{feedback}
 HONESTY
 - Separate documented facts from theories ("historians believe", "according to ...").
 - Never invent quotes, statistics, names or sources.
