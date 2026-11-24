@@ -1,8 +1,10 @@
+import json
 import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from src import edit, footage, pipeline, shorts
@@ -32,6 +34,19 @@ class PipelineTests(unittest.TestCase):
         errors = pipeline.media_problems(
             self.source, expected_duration=9.0, min_bytes=0)
         self.assertTrue(any("duration" in error for error in errors))
+
+    def test_ffprobe_missing_stream_durations_fall_back_to_container(self):
+        output = {
+            "format": {"duration": "4.0"},
+            "streams": [
+                {"codec_type": "video", "width": 1920, "height": 1080, "duration": "N/A"},
+                {"codec_type": "audio", "duration": None},
+            ],
+        }
+        with patch("src.pipeline.subprocess.run", return_value=SimpleNamespace(
+                returncode=0, stdout=json.dumps(output))):
+            self.assertEqual([], pipeline.media_problems(
+                self.source, expected_duration=4.0, min_bytes=0))
 
     def test_short_is_portrait_and_within_duration(self):
         short = self.wd / "short.mp4"
