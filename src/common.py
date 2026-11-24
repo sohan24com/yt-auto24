@@ -1,3 +1,83 @@
+import json, os, re, time, datetime as dt
+from pathlib import Path
+import requests, yaml
+
+ROOT = Path(__file__).resolve().parent.parent
+MEM = ROOT / "memory"
+(MEM / "videos").mkdir(parents=True, exist_ok=True)
+
+
+def cfg():
+    return yaml.safe_load((ROOT / "config.yaml").read_text())
+
+
+def env(name, required=True):
+    v = os.environ.get(name, "")
+    if required and not v:
+        raise RuntimeError(f"Missing environment variable: {name}")
+    return v
+
+
+def now():
+    return dt.datetime.now(dt.timezone.utc)
+
+
+# ---------- memory (one json file per video => no merge conflicts) ----------
+def load_videos():
+    return [json.loads(p.read_text()) for p in sorted((MEM / "videos").glob("*.json"))]
+
+
+def save_video(rec):
+    (MEM / "videos" / f"{rec['video_id']}.json").write_text(json.dumps(rec, indent=1))
+
+
+def load_insights():
+    p = MEM / "insights.json"
+    return json.loads(p.read_text()) if p.exists() else {"weights": None, "lessons": []}
+
+
+def save_insights(d):
+    (MEM / "insights.json").write_text(json.dumps(d, indent=1))
+
+
+# ---------- gemini ----------
+def extract_json(text):
+    text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
+    starts = [i for i in (text.find("{"), text.find("[")) if i != -1]
+    if not starts:
+        raise ValueError("no json found")
+    s = min(starts)
+    e = max(text.rfind("}"), text.rfind("]"))
+    return json.loads(text[s:e + 1])
+
+
+_MODELS = None
+
+
+def _model_list(key):
+    """Configured model first, then every Flash model the API currently offers (newest first)."""
+    global _MODELS
+    if _MODELS:
+        return _MODELS
+    c = cfg()
+    found = []
+    try:
+        r = requests.get("https://generativelanguage.googleapis.com/v1beta/models",
+                         params={"key": key, "pageSize": 1000}, timeout=30)
+        for m in r.json().get("models", []):
+            name = m["name"].split("/")[-1]
+            mm = re.fullmatch(r"gemini-(\d+(?:\.\d+)?)-flash(-lite)?(-preview)?", name)
+            if mm and "generateContent" in m.get("supportedGenerationMethods", []):
+                found.append((-float(mm.group(1)), bool(mm.group(2)), bool(mm.group(3)), name))
+        found.sort()
+    except Exception as e:
+        print("model discovery failed:", e)
+    order = [c["gemini_model"]] + [f[3] for f in found] + list(c.get("gemini_fallbacks", [])) + ["gemini-flash-latest"]
+    _MODELS = list(dict.fromkeys(order))
+    print("Gemini models to try:", _MODELS[:6])
+    return _MODELS
+
+
 class GeminiUnavailableError(RuntimeError):
     """Raised after bounded attempts across the configured Gemini keys and models."""
 
