@@ -50,6 +50,25 @@ class PipelineTests(unittest.TestCase):
             "GEMINI_API_KEY_5": "",
         }, clear=False)
 
+    def test_model_list_only_uses_free_tier_text_models(self):
+        common._MODELS = None
+        api_models = {
+            "models": [
+                {"name": "models/gemini-3.8-flash", "supportedGenerationMethods": ["generateContent"]},
+                {"name": "models/gemini-3.6-flash", "supportedGenerationMethods": ["generateContent"]},
+                {"name": "models/gemini-2.5-flash-lite", "supportedGenerationMethods": ["generateContent"]},
+                {"name": "models/gemini-3.1-flash-tts-preview", "supportedGenerationMethods": ["generateContent"]},
+            ]
+        }
+        with patch("src.common.cfg", return_value={
+                "gemini_model": "gemini-3.8-flash",
+                "gemini_fallbacks": ["gemini-3.7-flash", "gemini-3.5-flash"]}), \\
+             patch("src.common.requests.get", return_value=SimpleNamespace(
+                 json=lambda: api_models, raise_for_status=lambda: None)):
+            models = common._model_list("test-key")
+        self.assertEqual(["gemini-3.6-flash", "gemini-2.5-flash-lite"], models)
+        common._MODELS = None
+
     def test_gemini_rotates_to_next_key_on_quota(self):
         success = {"candidates": [{"content": {"parts": [{"text": '{"ok": true}'}]}}]}
         with self._gemini_test_env(), \
