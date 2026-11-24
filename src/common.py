@@ -51,33 +51,43 @@ def extract_json(text):
     return json.loads(text[s:e + 1])
 
 
+# Keep this allowlist limited to models whose standard text API has a documented free tier.
+# Model discovery only decides which supported allowlisted IDs to try; it never enables paid IDs.
+FREE_GEMINI_MODELS = (
+    "gemini-3.6-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash-lite",
+)
+
 _MODELS = None
 
 
 def _model_list(key):
-    """Configured model first, then every Flash model the API currently offers (newest first)."""
+    """Return only known free-tier text models, preferring the configured free model."""
     global _MODELS
     if _MODELS:
         return _MODELS
     c = cfg()
-    found = []
+    available = set()
     try:
         r = requests.get("https://generativelanguage.googleapis.com/v1beta/models",
                          params={"key": key, "pageSize": 1000}, timeout=30)
-        for m in r.json().get("models", []):
-            name = m["name"].split("/")[-1]
-            mm = re.fullmatch(r"gemini-(\d+(?:\.\d+)?)-flash(-lite)?(-preview)?", name)
-            if mm and "generateContent" in m.get("supportedGenerationMethods", []):
-                found.append((-float(mm.group(1)), bool(mm.group(2)), bool(mm.group(3)), name))
-        found.sort()
+        r.raise_for_status()
+        for model in r.json().get("models", []):
+            name = model["name"].split("/")[-1]
+            if "generateContent" in model.get("supportedGenerationMethods", []):
+                available.add(name)
     except Exception as e:
         print("model discovery failed:", type(e).__name__)
-    order = [c["gemini_model"]] + [f[3] for f in found] + list(c.get("gemini_fallbacks", [])) + ["gemini-flash-latest"]
+
+    configured = [c.get("gemini_model", "")] + list(c.get("gemini_fallbacks", []))
+    order = [name for name in configured if name in FREE_GEMINI_MODELS]
+    order.extend(name for name in FREE_GEMINI_MODELS
+                 if not available or name in available)
     _MODELS = list(dict.fromkeys(order))
-    print("Gemini models to try:", _MODELS[:6])
+    print("Free Gemini text models to try:", _MODELS)
     return _MODELS
-
-
 class GeminiUnavailableError(RuntimeError):
     """Raised after bounded attempts across the configured Gemini keys and models."""
 
