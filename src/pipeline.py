@@ -1,6 +1,6 @@
 """One run = one finished documentary: topic -> script -> fact-check -> voice -> footage -> edit
 -> quality gate -> thumbnails -> Drive -> YouTube -> Short -> memory."""
-import datetime as dt, os, shutil, tempfile, traceback
+import datetime as dt, json, os, shutil, subprocess, tempfile, traceback
 from pathlib import Path
 from . import topic as T, script as S, voice as V, footage as F, edit as E
 from . import thumbnail as TH, shorts as SH, drive as D, youtube as Y
@@ -12,6 +12,38 @@ def stamp(t):
     return f"{t // 60}:{t % 60:02d}"
 
 
+def media_problems(path, expected_duration=None, portrait=False, min_bytes=1 << 20):
+    """Probe completed media and reject missing, incomplete, wrong-frame, or unsynchronized output."""
+    path = Path(path)
+    if not path.is_file() or path.stat().st_size < min_bytes:
+        return ["missing or undersized output file"]
+    r = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries",
+         "format=duration:stream=codec_type,width,height,duration", "-of", "json", str(path)],
+        capture_output=True, text=True)
+    if r.returncode:
+        return ["ffprobe could not read output"]
+    try:
+        info = json.loads(r.stdout)
+        streams = info.get("streams", [])
+        video = next(s for s in streams if s.get("codec_type") == "video")
+        audio = next(s for s in streams if s.get("codec_type") == "audio")
+        duration = float(info["format"]["duration"])
+    except (ValueError, KeyError, StopIteration, TypeError):
+        return ["output is missing readable audio/video streams or duration"]
+    bad = []
+    expected_size = (1080, 1920) if portrait else (1920, 1080)
+    if (int(video.get("width", 0)), int(video.get("height", 0))) != expected_size:
+        bad.append(f"wrong resolution: {video.get('width')}x{video.get('height')}")
+    vd = float(video.get("duration", duration))
+    ad = float(audio.get("duration", duration))
+    if abs(vd - ad) > 1.0:
+        bad.append(f"audio/video duration mismatch: {ad:.2f}s vs {vd:.2f}s")
+    if expected_duration is not None and abs(duration - expected_duration) > 1.5:
+        bad.append(f"output duration {duration:.2f}s differs from expected {expected_duration:.2f}s")
+    return bad
+
+
 def gate(final, total, reuse):
     c = cfg()["video"]
     bad = []
@@ -19,9 +51,12 @@ def gate(final, total, reuse):
         bad.append(f"duration {total:.0f}s outside {c['min_seconds']}-{c['max_seconds']}")
     if reuse > c["max_footage_reuse"]:
         bad.append(f"footage reuse {reuse:.0%}")
-    size = Path(final).stat().st_size
-    if size < 20 << 20:
-        bad.append(f"file too small ({size >> 20} MB)")
+    bad.extend(media_problems(final, expected_duration=total, min_bytes=20 << 20))
+    ass = Path(final).parent / "subs.ass"
+    if not ass.is_file() or ass.stat().st_size < 100:
+        bad.append("subtitle source missing or empty")
+    elif sum(1 for line in ass.read_text(encoding="utf-8").splitlines() if line.startswith("Dialogue: 0,")) < 8:
+        bad.append("subtitle events missing")
     return bad
 
 
@@ -107,10 +142,13 @@ def main():
 
         meta = S.make_metadata(topic, [(stamp(st), s) for st, s in zip(starts, scenes)],
                                script.get("sources", []), F.credit_line())
-        frame = Path(wd) / "frame.jpg"
-        shots = sorted(Path(wd).glob("shot*.mp4"))          # frame from a clean shot (no burned subtitles)
-        TH.grab_frame(shots[len(shots) // 8], 1.0, frame)
-        thumbs = TH.make_thumbs(frame, meta["thumb_texts"], wd)
+        shots = sorted(Path(wd).glob("shot*.mp4"))          # clean shots have no burned subtitles
+        frame_paths = []
+        for n, idx in enumerate(sorted({0, len(shots) // 2, len(shots) - 1})):
+            frame = Path(wd) / f"frame_{n}.jpg"
+            TH.grab_frame(shots[idx], 0.8, frame)
+            frame_paths.append(frame)
+        thumbs = TH.make_thumbs(frame_paths, meta["thumb_texts"], wd)
 
         drive_video = D.upload(final, f"{today}_{meta['title'][:40]}.mp4")
         thumb_ids = [D.upload(t, f"{today}_{t.name}") for t in thumbs]
@@ -139,10 +177,22 @@ def main():
         if c["shorts"]["enabled"]:
             try:
                 sp = Path(wd) / "short.mp4"
-                SH.make_short(final, c["shorts"]["seconds"], sp)
+                short_start, short_duration, short_scene = SH.choose_moment(
+                    scenes, starts, durs, c["shorts"]["seconds"])
+                SH.make_short(final, short_start, short_duration, sp)
+                short_bad = media_problems(sp, expected_duration=short_duration, portrait=True)
+                if short_bad:
+                    raise RuntimeError("Short quality check failed: " + "; ".join(short_bad))
+                full_url = f"https://youtu.be/{vid}"
+                short_desc = (f"Watch the full documentary: {full_url}\n"
+                              "The story continues in the full video.\n\n#Shorts #documentary")
+                rec["short_scene"] = scenes[short_scene].get("title", "")
                 rec["short_id"] = Y.upload(sp, f"{meta['title'][:80]} #Shorts",
-                                           f"Full documentary: https://youtu.be/{vid}\n\n#Shorts #documentary",
-                                           meta["tags"] + ["shorts"])
+                                           short_desc, meta["tags"] + ["shorts"])
+                try:
+                    Y.add_comment(rec["short_id"], f"Full documentary: {full_url}")
+                except Exception as e:
+                    print("Short comment not posted (non-fatal):", e)
                 save_video(rec)
             except Exception as e:
                 print("short failed (non-fatal):", e)
