@@ -1,0 +1,40 @@
+name: documentary-quality
+on:
+  push:
+    branches:
+      - "feature/**"
+      - "apply-update/**"
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install open-source runtime and FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          python -m pip install -r requirements.txt
+      - name: Compile Python modules
+        run: python -m compileall -q src tools tests
+      - name: Run offline unit and FFmpeg smoke tests
+        run: python -m unittest discover -v
+      - name: Parse workflow YAML
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+          for path in Path(".github/workflows").glob("*.yml"):
+              data = yaml.safe_load(path.read_text())
+              assert isinstance(data, dict) and "jobs" in data, path
+          print("Workflow YAML parsed")
+          PY
