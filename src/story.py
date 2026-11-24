@@ -314,7 +314,20 @@ def validate_packaging(blueprint, metadata):
 
 
 def quality_score(blueprint, require_evidence=False):
-    """Return a compact transparent quality score and issue list (not a truth score)."""
+    """Return a weighted structural checklist score; this is not a score of factual truth."""
     issues = validate_blueprint(blueprint, require_evidence=require_evidence)
-    score = max(0, 100 - min(100, 6 * len(issues)))
-    return {"score": score, "label": "story_structure_score", "issues": issues}
+    categories = {
+        "hook": (15, lambda issue: issue.startswith("hook:")),
+        "three_act_structure": (15, lambda issue: issue.startswith("story:") and "repeat substantially" not in issue),
+        "retention_and_payoffs": (20, lambda issue: issue.startswith("retention:")),
+        "evidence_links": (15, lambda issue: issue.startswith("evidence:")),
+        "storyboard_alignment": (20, lambda issue: issue.startswith("storyboard:")),
+        "ending": (10, lambda issue: issue.startswith("ending:")),
+        "originality": (5, lambda issue: "repeat substantially" in issue),
+    }
+    components = {}
+    for name, (weight, matches) in categories.items():
+        failed = any(matches(issue) for issue in issues)
+        components[name] = {"earned": 0 if failed else weight, "possible": weight}
+    score = sum(item["earned"] for item in components.values())
+    return {"score": score, "label": "story_structure_score", "components": components, "issues": issues}
