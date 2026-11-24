@@ -22,11 +22,55 @@ def analytics_api():
     return _an
 
 
-def upload(path, title, description, tags, thumb=None):
+def find_upload_by_tag(tag):
+    """Find a prior upload in the channel's Uploads playlist before retrying an insert.
+
+    The tag is private video metadata rather than visible description text. Search
+    stops once playlist entries are older than the YYYYMMDD date embedded in tag.
+    """
+    match = __import__("re").search(r"yt-auto24-id-(\\d{8})-", str(tag))
+    if not match:
+        raise ValueError("idempotency tag must contain a YYYYMMDD date")
+    target_day = match.group(1)
+    channel = yt().channels().list(part="contentDetails", mine=True, maxResults=1).execute()
+    items = channel.get("items", [])
+    if not items:
+        raise RuntimeError("could not resolve the authorized channel uploads playlist")
+    playlist_id = items[0]["contentDetails"]["relatedPlaylists"]["uploads"]
+    token = None
+    while True:
+        page = yt().playlistItems().list(
+            part="snippet,contentDetails", playlistId=playlist_id, maxResults=50,
+            pageToken=token,
+        ).execute()
+        video_ids, older_than_target = [], False
+        for item in page.get("items", []):
+            published = str(item.get("snippet", {}).get("publishedAt", ""))
+            day = published[:10].replace("-", "")
+            if day and day < target_day:
+                older_than_target = True
+                continue
+            video_id = item.get("contentDetails", {}).get("videoId")
+            if video_id:
+                video_ids.append(video_id)
+        for start in range(0, len(video_ids), 50):
+            result = yt().videos().list(part="snippet", id=",".join(video_ids[start:start + 50])).execute()
+            for video in result.get("items", []):
+                if tag in video.get("snippet", {}).get("tags", []):
+                    return video["id"]
+        if older_than_target or not page.get("nextPageToken"):
+            return None
+        token = page["nextPageToken"]
+
+
+def upload(path, title, description, tags, thumb=None, idempotency_tag=None):
     c = cfg()["youtube"]
     status = {"privacyStatus": c["privacy"], "selfDeclaredMadeForKids": False}
     if c.get("synthetic_disclosure"):
         status["containsSyntheticMedia"] = True
+    tags = list(tags or [])
+    if idempotency_tag:
+        tags = list(dict.fromkeys(tags + [idempotency_tag]))
     body = {"snippet": {"title": title[:100], "description": description[:4900], "tags": tags,
                         "categoryId": c["category_id"], "defaultLanguage": "en", "defaultAudioLanguage": "en"},
             "status": status}
