@@ -1,0 +1,26 @@
+name: apply-update
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack the uploaded zip into the repo
+        run: |
+          set -e
+          Z=$(ls yt-doc-bot*.zip | head -n 1)
+          echo "Using $Z"
+          rm -rf /tmp/up && mkdir /tmp/up && unzip -q "$Z" -d /tmp/up
+          SRC=$(find /tmp/up -maxdepth 3 -name VERSION.txt -printf '%h\n' | head -n 1)
+          test -n "$SRC" || { echo "VERSION.txt not found in zip"; exit 1; }
+          rm -rf "$SRC/.github" "$SRC/memory"
+          rm -rf src tools
+          cp -r "$SRC"/. .
+          rm -f yt-doc-bot*.zip
+          echo "Installed: $(cat VERSION.txt)"
+          git config user.name "yt-bot"; git config user.email "bot@users.noreply.github.com"
+          git add -A
+          git commit -m "Apply update: $(cat VERSION.txt)"
+          git push
