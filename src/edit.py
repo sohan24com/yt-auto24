@@ -70,7 +70,7 @@ PlayResY: 1080
 
 [V4+ Styles]
 Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
-Style: Main,DejaVu Sans,62,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,4,1,2,120,120,90,1
+Style: Main,DejaVu Sans,62,&H00FFFFFF,&H0000D6FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,4,1,2,120,120,90,1
 Style: Hook,DejaVu Sans,150,&H0000D6FF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,2,0,1,9,2,5,120,120,60,1
 Style: Chapter,DejaVu Sans,40,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,6,0,1,3,1,7,110,110,80,1
 Style: Source,DejaVu Sans,28,&H00FFFFFF,&H000000FF,&H80000000,&H80000000,1,0,0,0,100,100,0,0,3,2,0,7,90,90,50,1
@@ -94,8 +94,18 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
         t = t0
         for c in chunks:
             dur = speech * len(c) / total
-            txt = c.replace("{", "(").replace("}", ")")
-            lines.append(f"Dialogue: 0,{ass_time(t)},{ass_time(t + dur)},Main,,0,0,0,,{txt}")
+            words_in_caption = c.replace("{", "(").replace("}", ")").split()
+            weights = [max(1, len(w.strip(",.!?;:")) ) for w in words_in_caption]
+            remaining_cs = max(len(weights), int(round(dur * 100)))
+            total_weight = sum(weights) or 1
+            karaoke = []
+            for wi, word in enumerate(words_in_caption):
+                cs = remaining_cs if wi == len(words_in_caption) - 1 else max(
+                    1, int(round(dur * 100 * weights[wi] / total_weight)))
+                remaining_cs -= cs
+                karaoke.append(f"{{\\k{cs}}}{word}")
+            lines.append(f"Dialogue: 0,{ass_time(t)},{ass_time(t + dur)},Main,,0,0,0,,"
+                         + " ".join(karaoke))
             t += dur
         t0 += d
     # kinetic hook title (first seconds) + chapter labels at each scene start
