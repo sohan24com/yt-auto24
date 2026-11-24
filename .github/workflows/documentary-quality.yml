@@ -22,7 +22,7 @@ jobs:
       - name: Install open-source runtime and FFmpeg
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          sudo apt-get install -y ffmpeg fonts-dejavu-core espeak-ng
           python -m pip install -r requirements.txt
       - name: Compile Python modules
         run: python -m compileall -q src tools tests
