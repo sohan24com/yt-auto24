@@ -84,6 +84,28 @@ Schedule: `generate.yml` runs 05:30 and 13:30 UTC (edit the cron), `analytics.ym
 - CTR metric (`videoThumbnailImpressionsClickRate`) may be unavailable for some channels; the code then
   falls back to view counts.
 
+## Story and retention engine (Phase 3)
+
+- Script drafts use a fixed three-act, 18-scene blueprint with a one-sentence cold open, a central question,
+  a title promise, scheduled reveals, and explicit open-loop/payoff IDs. The final scene is reserved for a
+  resolved ending and a short natural channel invitation.
+- Every scene stores story purpose, new progression, a cause/effect link, an emotion, a narration-to-visual
+  anchor, footage keywords, camera movement, animation, sound effect, music mood, transition, and an estimated
+  duration. The full story blueprint and Phase 2 research dossier are saved to Drive and referenced in the video record.
+- Before footage search/rendering, the code checks three-act coverage, loop closure, source IDs, storyboard
+  completeness, title-promise overlap, repeated narration, and visual-anchor overlap. After TTS, it checks the
+  actual first scene audio duration (maximum 5 seconds) and actual scene audio intervals (20-45 seconds) before
+  continuing. Failed timing is fed back into bounded script retries.
+- The structural score is a weighted checklist for hook, acts, retention/payoffs, evidence links, storyboard,
+  ending, and repetition. It is not a score of factual truth or a guarantee of audience retention. Source
+  statements remain search-assisted and need editorial review; visual-anchor matching is a lexical safety check,
+  not proof of semantic accuracy.
+- A tested research sample is in
+  [samples/antikythera_story_blueprint.json](samples/antikythera_story_blueprint.json). Its 2021 front-dial
+  model is labeled as a published reconstruction with theoretical parts, not a proven exact replica.
+- No paid story services or new paid APIs are introduced. This quality workflow uses the existing free provider
+  configuration and offline Python tests; it does not publish or upload videos.
+
 ## Tuning
 
 `config.yaml`: niche/tone, category mix, word counts, voice, privacy, Shorts, retention days, swap threshold.
