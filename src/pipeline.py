@@ -140,8 +140,8 @@ def _publish_short(record, final_path, wd, tags, title, seconds):
     if problems:
         raise RuntimeError("Short quality check failed: " + "; ".join(problems))
     video_url = record["url"]
-    description = (f"Watch the full documentary: {video_url}\\n"
-                   "The story continues in the full video.\\n\\n#Shorts #documentary")
+    description = (f"Watch the full documentary: {video_url}\n"
+                   "The story continues in the full video.\n\n#Shorts #documentary")
     tag = _short_tag(record["job_id"])
     existing = Y.find_upload_by_tag(tag)
     if existing:
