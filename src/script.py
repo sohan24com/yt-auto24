@@ -114,7 +114,15 @@ def valid(script):
         problems.append("hook_text must contain 3-5 words")
     if not sc or len(sc[-1].get("narration", "").split()) < 20:
         problems.append("missing documentary outro/payoff")
-    return problems
+    if script.get("story_schema_version") == 1:
+        from .story import quality_score
+        story_result = quality_score(script, require_evidence=False)
+        problems.extend(story_result["issues"])
+        minimum = int(cfg().get("story", {}).get("minimum_quality_score", 76))
+        if story_result["score"] < minimum:
+            problems.append(f"story quality score {story_result['score']} is below {minimum}")
+        script["story_quality"] = story_result
+    return list(dict.fromkeys(problems))
 
 
 def _fallback_terms(text, limit=4):
