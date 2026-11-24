@@ -95,7 +95,7 @@ def _gemini(text, out, emotion, keys):
         try:   # 1) Interactions API (current docs)
             r = requests.post("https://generativelanguage.googleapis.com/v1beta/interactions",
                               headers={"x-goog-api-key": key, "Content-Type": "application/json"},
-                              json={"model": v["gemini_tts_model"], "input": prompt,
+                              json={"model": v["gemini_tts_model"], "input": prompt, "stream": False,
                                     "response_format": {"type": "audio"},
                                     "generation_config": {"speech_config": [{"voice": v["gemini_voice"]}]}},
                               timeout=180)
