@@ -15,12 +15,13 @@ Topic: {topic['topic']}
 Angle: {topic['angle']}
 
 STRUCTURE
-- Scene 1 is the COLD OPEN, max 28 words (about 10 seconds spoken). Its FIRST sentence must be the most startling,
-  specific, TRUE fact or question of the whole story, with a concrete image (a number, a place, a date, an object).
-  No greeting, no "welcome", no channel intro, no throat-clearing. End it on a cliffhanger that makes leaving impossible.
-  Also give "hook_text": 3-5 ALL-CAPS words shown big on screen in the first seconds (e.g. "WHERE ARE THEY?").
-- Then 10-12 more scenes. Every second scene must end with an OPEN LOOP (a question answered later).
-- Final scene: the payoff, a thought-provoking close, one short line inviting viewers to subscribe for the next story.
+- Scene 1 starts immediately with a truthful, source-checkable hook that can be spoken in 5 seconds (max 12 words).
+  The FIRST sentence must use a concrete, story-specific fact or question; no invented numbers, greetings, welcome,
+  channel introduction, or throat-clearing. Leave a real unresolved question for the story to answer.
+  Give "hook_text": 3-5 short ALL-CAPS words that accurately summarize this hook.
+- Follow with 10-12 scenes that build a clear cause-and-effect story; use an open loop only when the next scene answers it.
+- Final scene delivers the researched payoff, then a natural outro thanking viewers, inviting Like/Comment/Subscribe,
+  and pointing to the next related documentary without inventing a specific video title or link.
 DELIVERY
 - For every scene give "emotion": a short voice-acting direction that matches what happens in it, e.g.
   "hushed, suspenseful", "somber, slow", "awed, rising", "urgent, tense", "calm, matter-of-fact", "warm, reflective".
@@ -72,34 +73,84 @@ def valid(script):
         problems.append("too few scenes")
     if not (v["words_min"] * 0.9 <= w <= v["words_max"] * 1.1):
         problems.append(f"word count {w}")
-    if sc and len(sc[0]["narration"].split()) > 60:
-        problems.append("hook too long")
+    if sc and len(sc[0]["narration"].split()) > 16:
+        problems.append("5-second hook too long")
+    hook = str(script.get("hook_text", "")).split()
+    if not 3 <= len(hook) <= 5:
+        problems.append("hook_text must contain 3-5 words")
+    if not sc or len(sc[-1].get("narration", "").split()) < 20:
+        problems.append("missing documentary outro/payoff")
     return problems
+
+
+def _fallback_terms(text, limit=4):
+    import re
+    stop = {"the", "and", "for", "from", "with", "what", "when", "where", "why", "how", "was", "were",
+            "that", "this", "into", "over", "after", "before", "story", "about"}
+    words = [w for w in re.findall(r"[A-Za-z0-9'-]+", str(text)) if w.lower() not in stop]
+    return words[:limit]
 
 
 def make_metadata(topic, scenes_with_times, sources, credits):
     chapters = "\n".join(f"{t} {s['title']}" for t, s in scenes_with_times)
     outline = "; ".join(s["title"] for _, s in scenes_with_times)
-    prompt = f"""Create YouTube packaging for a documentary video.
+    prompt = f"""Create honest YouTube packaging for this researched documentary.
 Topic: {topic['topic']} | Angle: {topic['angle']} | Chapters: {outline}
-1) Write 10 title candidates (max 65 chars, curiosity + clarity, honest: the video must deliver on it).
-   Score each 1-10 for curiosity, clarity, honesty. Mix styles: question, bold claim, number, mystery.
-2) Give 3 thumbnail texts (max 4 words each, ALL CAPS, different angles).
-3) Write a description: 2 punchy opening lines (no greeting), then 2 short paragraphs summarising the story
-   without spoiling the payoff. Do NOT include chapters or sources, I add them.
-4) 12 tags.
+1) Write 10 truthful title candidates (max 65 chars). Claims must be supported by the topic and chapter facts.
+2) Give 3 distinct thumbnail texts (2-4 words), each traceable to the topic, angle, or chapter names. No invented claim.
+3) Write a description: 2 punchy opening lines, then 2 short accurate paragraphs. Do NOT include chapters or sources.
+4) Give 12 relevant tags.
 Return JSON: {{"titles":[{{"title":"","curiosity":0,"clarity":0,"honesty":0}}],"thumb_texts":["","",""],"description":"","tags":[""]}}"""
-    m = gemini(prompt)
-    titles = sorted(m["titles"], key=lambda t: t["curiosity"] + t["clarity"] + 2 * t["honesty"], reverse=True)
+    try:
+        m = gemini(prompt)
+    except Exception as e:
+        print("metadata generation failed; using factual fallback:", e)
+        title = str(topic.get("topic") or "Documentary")[:65]
+        title_b = (f"The story of {topic.get('topic', 'this subject')}")[:65]
+        angle = str(topic.get("angle") or "")
+        m = {
+            "titles": [{"title": title, "curiosity": 5, "clarity": 8, "honesty": 10},
+                       {"title": title_b, "curiosity": 6, "clarity": 8, "honesty": 10}],
+            "thumb_texts": [" ".join(_fallback_terms(topic.get("topic"), 3)),
+                            " ".join(_fallback_terms(angle, 3)),
+                            " ".join(_fallback_terms(scenes_with_times[0][1].get("title", ""), 3))
+                            if scenes_with_times else title[:24]],
+            "description": (f"This documentary examines {topic.get('topic', 'the subject')} and the question "
+                            f"{angle}. It follows the evidence and separates established facts from uncertainty."),
+            "tags": [str(topic.get("category", "documentary")), "documentary", "history", "research"],
+        }
+    titles = sorted(m.get("titles", []),
+                    key=lambda t: t.get("curiosity", 0) + t.get("clarity", 0) + 2 * t.get("honesty", 0),
+                    reverse=True)
+    if not titles:
+        titles = [{"title": str(topic.get("topic") or "Documentary"), "honesty": 10}]
     src = "\n".join("- " + s for s in sources[:8])
-    desc = (f"{m['description']}\n\nCHAPTERS\n{chapters}\n\nSOURCES\n{src}\n\n"
+    desc = (f"{m.get('description', topic.get('topic', 'Documentary'))}\n\nCHAPTERS\n{chapters}\n\nSOURCES\n{src}\n\n"
             f"FOOTAGE: {credits}\nNarration is AI-generated; research assisted by AI and fact-checked against web sources.")
+    anchors = set(w.lower() for w in _fallback_terms(
+        topic.get("topic", "") + " " + topic.get("angle", "") + " " + outline, 80))
+    fallback_texts = [" ".join(_fallback_terms(topic.get("topic"), 3)),
+                      " ".join(_fallback_terms(topic.get("angle"), 3)),
+                      " ".join(_fallback_terms(outline, 3))]
+    thumb_texts = []
+    generated = m.get("thumb_texts") or []
+    stop = {"the", "and", "for", "from", "with", "what", "when", "where", "why", "how", "was", "were",
+            "that", "this", "into", "over", "after", "before"}
+    import re
+    for i in range(3):
+        text = " ".join(str(generated[i] if i < len(generated) else "").upper().split())
+        words = re.findall(r"[A-Z0-9'-]+", text)
+        claims = {w.lower() for w in words if w.lower() not in stop}
+        if not (2 <= len(words) <= 4 and claims and claims <= anchors):
+            text = fallback_texts[i] or str(topic.get("topic", "DOCUMENTARY"))[:24]
+        thumb_texts.append(text.upper())
     return {
-        "title": titles[0]["title"][:100], "title_b": (titles[1] if len(titles) > 1 else titles[0])["title"][:100],
-        "thumb_texts": (m["thumb_texts"] + m["thumb_texts"])[:3], "description": desc,
-        "tags": m["tags"][:15],
+        "title": str(titles[0].get("title") or topic.get("topic", "Documentary"))[:100],
+        "title_b": str((titles[1] if len(titles) > 1 else titles[0]).get("title") or topic.get("topic", "Documentary"))[:100],
+        "thumb_texts": thumb_texts,
+        "description": desc[:4900],
+        "tags": m.get("tags", ["documentary", "research"])[:15],
     }
-
 
 def beats(scenes, durs, plans):
     """Split each scene's narration across its shots, in proportion to shot length -> text spoken during each shot."""

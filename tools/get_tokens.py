@@ -3,10 +3,12 @@
    python get_tokens.py drive       -> Google Drive token
 Google does not allow Drive and YouTube scopes in one request, so we make two tokens."""
 import sys
+from pathlib import Path
 from google_auth_oauthlib.flow import InstalledAppFlow
 
 SC = {
     "youtube": ["https://www.googleapis.com/auth/youtube",
+                "https://www.googleapis.com/auth/youtube.force-ssl",
                 "https://www.googleapis.com/auth/yt-analytics.readonly"],
     "drive": ["https://www.googleapis.com/auth/drive.file"],
 }
@@ -19,8 +21,9 @@ flow = InstalledAppFlow.from_client_secrets_file("client_secret.json", SC[which]
 creds = flow.run_local_server(port=0, access_type="offline", prompt="consent")
 print()
 if which == "youtube":
-    print("GOOGLE_CLIENT_ID     =", creds.client_id)
-    print("GOOGLE_CLIENT_SECRET =", creds.client_secret)
-    print("GOOGLE_REFRESH_TOKEN =", creds.refresh_token)
+    output = Path(__file__).resolve().parent / ".youtube_refresh_token"
 else:
-    print("GOOGLE_DRIVE_REFRESH_TOKEN =", creds.refresh_token)
+    output = Path(__file__).resolve().parent / ".drive_refresh_token"
+
+output.write_text(creds.refresh_token + "\n", encoding="utf-8")
+print(f"Refresh token saved locally to {output.name}; its value was not displayed.")

@@ -1,8 +1,9 @@
 # YT Documentary Bot (free, GitHub Actions)
 
-2 documentaries/day (8-10 min, English) for 30 days: topic -> script -> fact-check -> voice -> footage ->
-edit -> quality gate -> thumbnails -> Google Drive (auto-delete after 3 days) -> YouTube (+1 Short each) ->
-analytics loop that re-weights topics and swaps weak thumbnails/titles.
+2 documentaries/day (8-10 min, English) for 30 days: topic -> script -> fact-check -> voice -> matched footage ->
+mood-aware edit -> quality gate -> distinct thumbnails -> Google Drive -> YouTube (+ story-selected Short) ->
+analytics loop. The pipeline uses open-source FFmpeg/Pillow plus existing free APIs; it keeps safe fallbacks and never
+uploads media that fails the media probes.
 
 ## Setup (about 45 minutes, once)
 
@@ -20,11 +21,14 @@ analytics loop that re-weights topics and swaps weak thumbnails/titles.
      dies after 7 days and the whole system stops.
    - Credentials -> OAuth client ID -> **Desktop app** -> download as `tools/client_secret.json`.
    - On your PC: `cd tools && pip install google-auth-oauthlib && python get_tokens.py`, sign in with the YouTube
-     channel's Google account, then add the 3 printed values as secrets: `GOOGLE_CLIENT_ID`,
-     `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_DRIVE_REFRESH_TOKEN` (run get_tokens.py twice: youtube, drive).
+     channel's Google account, then add the printed values as secrets: `GOOGLE_CLIENT_ID`,
+     `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_DRIVE_REFRESH_TOKEN` (run `get_tokens.py youtube`
+     and `get_tokens.py drive`). The YouTube scope now includes `youtube.force-ssl` for the optional Shorts comment;
+     after merging this feature, regenerate `GOOGLE_REFRESH_TOKEN` with the YouTube command.
 5. **Optional** Telegram alerts: secrets `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
-6. **Optional but recommended**: put 5-10 royalty-free tracks (YouTube Audio Library, no attribution needed)
-   in `assets/music/*.mp3`. Without them the system synthesizes a plain ambient drone.
+6. **Optional music**: add only tracks you have rights to use under `assets/music/`. Name tracks with a mood word
+   such as `suspense_01.mp3`, `tension_01.mp3`, `emotional_01.mp3`, `wonder_01.mp3`, or `neutral_01.mp3`.
+   The editor matches those tracks to scene emotion and synthesizes a free ambient bed for moods with no matching file.
 7. Edit `config.yaml` -> `start_date` (day 1). Then Actions tab -> **generate-video -> Run workflow**
    with force = 1 for a first test. Check the video before trusting the schedule.
 
@@ -45,7 +49,14 @@ Schedule: `generate.yml` runs 05:30 and 13:30 UTC (edit the cron), `analytics.ym
 - **Fact-check** uses Gemini with Google Search grounding. It reduces errors, it does not eliminate them.
   Review the first videos by hand, especially for the "mystery" category.
 - **edge-tts** calls Microsoft's online voices; if they ever block GitHub IPs, swap `voice.py` for another TTS.
-- Free footage is Pexels + NASA (free licences). Do not add other people's clips.
+- Footage results are matched to narration terms. Pexels/Pixabay are labeled illustrative; Wikimedia reference
+  images and Internet Archive clips carry source labels. When nothing relevant is available, the video shows a
+  generated context card instead of unrelated stock.
+- Shorts select a curiosity moment before the final scene from across the documentary, use a 9:16 frame, and link
+  to the full video in both description and a top-level comment. The YouTube Data API does not expose comment pinning.
+- Captions use animated word highlighting with estimated word timing; they are not forced-aligned to phonemes/audio.
+- Run offline checks with `python -m unittest discover -v`; the `documentary-quality` workflow runs these checks
+  and FFmpeg smoke tests on feature branches and pull requests. It never publishes videos.
 - Memory lives in `memory/` (committed to the repo). Drive holds only the 3-day video/thumbnail buffer.
 - CTR metric (`videoThumbnailImpressionsClickRate`) may be unavailable for some channels; the code then
   falls back to view counts.
@@ -53,4 +64,5 @@ Schedule: `generate.yml` runs 05:30 and 13:30 UTC (edit the cron), `analytics.ym
 ## Tuning
 
 `config.yaml`: niche/tone, category mix, word counts, voice, privacy, Shorts, retention days, swap threshold.
-Test locally: `FORCE=1 python -m src.pipeline` (needs ffmpeg + env vars).
+Run offline checks: `python -m unittest discover -v` (requires FFmpeg/ffprobe). To test generation manually,
+`FORCE=1 python -m src.pipeline` still needs API secrets and may upload a video.

@@ -50,11 +50,20 @@ def _text(draw, lines, font, size, x, y, fill, stroke=10):
         draw.text((x, y + i * int(size * 1.08)), l, font=font, fill=fill, stroke_width=stroke, stroke_fill=(0, 0, 0))
 
 
-def make_thumbs(frame, texts, out_dir):
+def make_thumbs(frames, texts, out_dir):
+    """Render three distinct truthful concepts from three different story moments."""
     out_dir = Path(out_dir)
+    if isinstance(frames, (str, Path)):
+        frames = [frames]
+    if not frames:
+        raise ValueError("at least one source frame is required")
+    source = [frames[i % len(frames)] for i in range(3)]
+    texts = list(texts or [])
+    while len(texts) < 3:
+        texts.append(" ".join(Path(source[len(texts)]).stem.split("_")[-2:]) or "THE STORY")
     paths = []
-    # A: dark, yellow text bottom-left
-    im = ImageEnhance.Brightness(_base(frame)).enhance(0.55)
+    # A: first story moment, dark with yellow text.
+    im = ImageEnhance.Brightness(_base(source[0])).enhance(0.55)
     im = ImageEnhance.Contrast(im).enhance(1.25)
     d = ImageDraw.Draw(im)
     lines = _wrap(texts[0])
@@ -62,7 +71,7 @@ def make_thumbs(frame, texts, out_dir):
     _text(d, lines, f, s, 60, H - 60 - int(s * 1.08) * len(lines), (255, 214, 0))
     paths.append(out_dir / "thumb_a.jpg"); im.save(paths[-1], quality=90)
     # B: left gradient, white text with red bar
-    im = ImageEnhance.Color(_base(frame)).enhance(1.4)
+    im = ImageEnhance.Color(_base(source[1])).enhance(1.4)
     grad = Image.new("L", (W, H), 0)
     gd = ImageDraw.Draw(grad)
     for x in range(W):
@@ -76,7 +85,7 @@ def make_thumbs(frame, texts, out_dir):
     _text(d, lines, f, s, 85, y, (255, 255, 255), 8)
     paths.append(out_dir / "thumb_b.jpg"); im.save(paths[-1], quality=90)
     # C: blurred edges, text on top band
-    im = ImageEnhance.Contrast(_base(frame)).enhance(1.35)
+    im = ImageEnhance.Contrast(_base(source[2])).enhance(1.35)
     band = Image.new("RGBA", (W, 260), (0, 0, 0, 170))
     im = im.convert("RGBA"); im.alpha_composite(band, (0, 0)); im = im.convert("RGB")
     d = ImageDraw.Draw(im)

@@ -2,25 +2,64 @@ name: apply-update
 on: workflow_dispatch
 permissions:
   contents: write
+  pull-requests: write
 jobs:
   apply:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Unpack the uploaded zip into the repo
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate and stage package on a branch
+        id: stage
         run: |
-          set -e
-          Z=$(ls yt-doc-bot*.zip | head -n 1)
-          echo "Using $Z"
-          rm -rf /tmp/up && mkdir /tmp/up && unzip -q "$Z" -d /tmp/up
-          SRC=$(find /tmp/up -maxdepth 3 -name VERSION.txt -printf '%h\n' | head -n 1)
-          test -n "$SRC" || { echo "VERSION.txt not found in zip"; exit 1; }
-          rm -rf "$SRC/.github" "$SRC/memory"
-          rm -rf src tools
-          cp -r "$SRC"/. .
-          rm -f yt-doc-bot*.zip
-          echo "Installed: $(cat VERSION.txt)"
-          git config user.name "yt-bot"; git config user.email "bot@users.noreply.github.com"
+          set -euo pipefail
+          mapfile -t packages < <(find . -maxdepth 1 -type f -name 'yt-doc-bot*.zip' -print | sort)
+          test "${#packages[@]}" -eq 1 || { echo "Expected exactly one yt-doc-bot*.zip"; exit 1; }
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          unzip -q "${packages[0]}" -d "$tmp"
+          src="$(find "$tmp" -maxdepth 4 -name VERSION.txt -printf '%h\n' | head -n 1)"
+          test -n "$src" || { echo "VERSION.txt not found in package"; exit 1; }
+          test -f "$src/src/pipeline.py" -a -f "$src/src/script.py" -a -f "$src/config.yaml" -a -f "$src/requirements.txt" \
+            || { echo "Package is missing required project files"; exit 1; }
+          rm -rf "$src/.github" "$src/memory"
+          branch="apply-update/$(date -u +%Y%m%d%H%M%S)"
+          git switch -c "$branch"
+          cp -a "$src"/. .
+          python -m compileall -q src tools
+          python -m unittest discover -v
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "version=$(cat VERSION.txt)" >> "$GITHUB_OUTPUT"
+      - name: Push review branch
+        id: push
+        env:
+          BRANCH: ${{ steps.stage.outputs.branch }}
+        run: |
+          set -euo pipefail
           git add -A
-          git commit -m "Apply update: $(cat VERSION.txt)"
-          git push
+          if git diff --cached --quiet; then
+            echo "No package changes"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Apply package update: ${{ steps.stage.outputs.version }}"
+          git push --set-upstream origin "$BRANCH"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+      - name: Open review pull request
+        if: steps.push.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.stage.outputs.branch }}
+          VERSION: ${{ steps.stage.outputs.version }}
+        run: |
+          gh pr create --base main --head "$BRANCH" \
+            --title "Apply package update: $VERSION" \
+            --body "Validated package update. Review the diff and CI before merging."
