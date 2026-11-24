@@ -17,7 +17,7 @@ analytics loop that re-weights topics and swaps weak thumbnails/titles.
    - Credentials -> OAuth client ID -> **Desktop app** -> download as `tools/client_secret.json`.
    - On your PC: `cd tools && pip install google-auth-oauthlib && python get_tokens.py`, sign in with the YouTube
      channel's Google account, then add the 3 printed values as secrets: `GOOGLE_CLIENT_ID`,
-     `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`.
+     `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_DRIVE_REFRESH_TOKEN` (run get_tokens.py twice: youtube, drive).
 5. **Optional** Telegram alerts: secrets `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 6. **Optional but recommended**: put 5-10 royalty-free tracks (YouTube Audio Library, no attribution needed)
    in `assets/music/*.mp3`. Without them the system synthesizes a plain ambient drone.
