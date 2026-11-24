@@ -2,6 +2,7 @@ from google.oauth2.credentials import Credentials
 from .common import env
 
 YT_SCOPES = ["https://www.googleapis.com/auth/youtube",
+             "https://www.googleapis.com/auth/youtube.force-ssl",
              "https://www.googleapis.com/auth/yt-analytics.readonly"]
 DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
