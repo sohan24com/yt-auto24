@@ -32,30 +32,53 @@ def plan_shots(d, fast=0.0):
     return out
 
 
-def render_shot(asset, d, out, n, punch=False):
+def _pan_position(movement, frames):
+    move = str(movement or "").lower().replace("-", " ")
+    progress = f"min(on/{max(1, frames)},1)"
+    span = "(iw-iw/zoom)"
+    x, y = "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"
+    if "pan left" in move:
+        x = f"{span}*(1-{progress})"
+    elif "pan right" in move:
+        x = f"{span}*{progress}"
+    elif "tilt up" in move:
+        y = f"(ih-ih/zoom)*(1-{progress})"
+    elif "tilt down" in move:
+        y = f"(ih-ih/zoom)*{progress}"
+    return x, y
+
+
+def render_shot(asset, d, out, n, punch=False, camera_movement=""):
     p = str(asset["path"])
+    frames = max(1, int(float(d) * FPS))
+    x, y = _pan_position(camera_movement, frames)
+    move = str(camera_movement or "").lower()
+    zoom_out = any(term in move for term in ("zoom out", "pull back", "pull out"))
     if asset["kind"] == "video":
         if punch:   # fast push-in used in the opening seconds
             vf = (f"fps={FPS},scale=2400:1350:force_original_aspect_ratio=increase,crop=2400:1350,"
                   f"zoompan=z='min(zoom+0.004,1.28)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1920x1080:fps={FPS},{GRADE}")
         else:
-            z = ("if(eq(on,1),1.0,min(zoom+0.00022,1.06))" if n % 2 == 0
-                 else "if(eq(on,1),1.06,max(zoom-0.00022,1.0))")
+            z = ("if(eq(on,1),1.06,max(zoom-0.00022,1.0))" if zoom_out else
+                 "if(eq(on,1),1.0,min(zoom+0.00022,1.06))" if n % 2 == 0 else
+                 "if(eq(on,1),1.06,max(zoom-0.00022,1.0))")
             vf = (f"scale=2400:1350:force_original_aspect_ratio=increase,crop=2400:1350,fps={FPS},"
-                  f"zoompan=z='{z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:"
+                  f"zoompan=z='{z}':x='{x}':y='{y}':d=1:"
                   f"s=1920x1080:fps={FPS},{GRADE}")
         run(["ffmpeg", "-y", "-stream_loop", "-1", "-i", p, "-t", f"{d}", "-vf", vf, *X264, str(out)])
     else:
-        frames = int(d * FPS) + 2
-        step = (0.5 if punch else 0.35) / frames
-        if n % 2 or punch:
+        frame_count = int(float(d) * FPS) + 2
+        step = (0.5 if punch else 0.35) / frame_count
+        if zoom_out:
+            z = f"max(zoom-{step:.6f},1.0)"
+        elif n % 2 or punch:
             z = f"min(zoom+{step:.6f},1.5)"
         else:
             z = f"if(eq(on,1),1.35,max(zoom-{step:.6f},1.0))"
+        x, y = _pan_position(camera_movement, frame_count)
         vf = (f"scale=2400:1350:force_original_aspect_ratio=increase,crop=2400:1350,"
-              f"zoompan=z='{z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s=1920x1080:fps={FPS},{GRADE}")
+              f"zoompan=z='{z}':x='{x}':y='{y}':d={frame_count}:s=1920x1080:fps={FPS},{GRADE}")
         run(["ffmpeg", "-y", "-i", p, "-t", f"{d}", "-vf", vf, *X264, str(out)])
-
 
 def ass_time(t):
     h, m, s = int(t // 3600), int(t % 3600 // 60), t % 60
@@ -119,8 +142,17 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
     for i, (sc, d) in enumerate(zip(scenes, durs)):
         if i > 0:
             title = sc.get("title", "").upper().replace("{", "(").replace("}", ")")
-            lines.append(f"Dialogue: 1,{ass_time(t0 + 0.3)},{ass_time(t0 + 3.6)},Chapter,,0,0,0,,"
-                         "{\\fad(300,500)}" + f"{i + 1:02d}  |  {title}")
+            plan = sc.get("visual_plan", {})
+        animation = str(plan.get("animation", "")).lower() if isinstance(plan, dict) else ""
+        reveal = str(sc.get("information_reveal", "")).strip()
+        label = f"{i + 1:02d}  |  {title}"
+        if reveal and any(word in animation for word in ("label", "text", "graphic", "diagram", "callout")):
+            short_reveal = " ".join(reveal.split()[:6]).upper().replace("{", "(").replace("}", ")")
+            label += "\\N" + short_reveal
+        transition = str(plan.get("transition", "")).lower() if isinstance(plan, dict) else ""
+        fade_in = "150" if "flash" in transition else "300"
+        lines.append(f"Dialogue: 1,{ass_time(t0 + 0.3)},{ass_time(t0 + 3.6)},Chapter,,0,0,0,,"
+                     + f"{{\\fad({fade_in},500)}}{label}")
         t0 += d
     for start, end, label in (shot_labels or []):
         safe = str(label).replace("{", "(").replace("}", ")")
@@ -196,7 +228,9 @@ def make_music(total, out, wd, scenes=None, durs=None):
     cmd, filters, inputs = ["ffmpeg", "-y"], [], []
     crossfade = min(0.8, max(0.0, min(durs) / 4 if durs else 0.0))
     for i, (scene, duration) in enumerate(zip(scenes, durs)):
-        mood = _music_mood(scene.get("emotion"))
+        visual_plan = scene.get("visual_plan", {})
+        requested_mood = visual_plan.get("music_mood", "") if isinstance(visual_plan, dict) else ""
+        mood = _music_mood(requested_mood or scene.get("emotion"))
         track = _music_track(mood, tracks)
         segment = max(float(duration), 0.1) + crossfade
         if track:
@@ -268,10 +302,12 @@ def assemble(scenes, durs, plans, assets_by_scene, voice, wd, out, hook_text="")
     wd = Path(wd)
     shots, n, clock = [], 0, 0.0
     shot_labels = []
-    for plan, assets in zip(plans, assets_by_scene):
+    for scene, plan, assets in zip(scenes, plans, assets_by_scene):
+        visual_plan = scene.get("visual_plan", {})
+        movement = visual_plan.get("camera_movement", "") if isinstance(visual_plan, dict) else ""
         for l, a in zip(plan, assets):
             o = wd / f"shot{n:04d}.mp4"
-            render_shot(a, l, o, n, punch=clock < 10.0)      # push-in on every shot of the cold open
+            render_shot(a, l, o, n, punch=clock < 10.0, camera_movement=movement)      # push-in on every shot of the cold open
             shots.append(o)
             shot_labels.append((clock, clock + l, _source_label(a)))
             clock += l
@@ -286,7 +322,7 @@ def assemble(scenes, durs, plans, assets_by_scene, voice, wd, out, hook_text="")
     make_music(total, wd / "music.wav", wd, scenes=scenes, durs=durs)
     make_whoosh(wd / "whoosh.wav")
     make_impact(wd / "impact.wav")
-    mix_audio(voice, wd / "music.wav", wd / "whoosh.wav", wd / "impact.wav", starts[1:], total, wd / "mix.wav")
+    mix_audio(voice, wd / "music.wav", wd / "whoosh.wav", wd / "impact.wav", starts[1:], total, wd / "mix.wav", scenes=scenes)
     run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "shots.txt", "-i", "mix.wav",
          "-vf", "subtitles=subs.ass", "-map", "0:v", "-map", "1:a",      # no fade-in: the video starts on a hit
          "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p",
