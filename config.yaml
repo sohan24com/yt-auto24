@@ -25,6 +25,12 @@ video:
   gemini_voice: "Schedar"                           # male, even tone (alternatives: Sulafat, Umbriel, Zephyr)
   max_footage_reuse: 0.35
 
+story:
+  minimum_quality_score: 76
+  hook_max_seconds: 5
+  min_progression_seconds: 20
+  max_progression_seconds: 45
+
 publishing:
   require_search_linked_fact_check: true
   require_license_manifest: true
