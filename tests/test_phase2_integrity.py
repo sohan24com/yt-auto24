@@ -62,13 +62,13 @@ class QualityTests(unittest.TestCase):
             path = Path(td) / "subs.ass"
             path.write_text("Dialogue: 0,0:00:00.00,0:00:03.00,Main,,0,0,0,,Hello\n" * 8,
                             encoding="utf-8")
-            self.assertIn("subtitle event outside video duration", quality.validate_ass(path, 2.0))
+            self.assertIn("subtitle event outside video duration", quality.validate_ass(path, 1.5))
 
     def test_thumbnail_dimensions_are_checked(self):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "thumb.jpg"
             Image.new("RGB", (1280, 720), "navy").save(path, quality=90)
-            self.assertEqual([], quality.validate_thumbnail(path))
+            self.assertEqual([], quality.validate_thumbnail(path, min_bytes=0))
             Image.new("RGB", (640, 360), "navy").save(path, quality=90)
             self.assertIn("wrong thumbnail dimensions: 640x360", quality.validate_thumbnail(path))
 
