@@ -155,6 +155,7 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual([], script.valid(data))
 
     def test_unmatched_shot_uses_labeled_context_card(self):
+        footage.reset()
         with patch("src.footage._stock", return_value=[]), \
              patch("src.footage._nasa", return_value=[]), \
              patch("src.footage._archive", return_value=[]):
