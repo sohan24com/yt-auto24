@@ -58,7 +58,7 @@ def ass_time(t):
     return f"{h}:{m:02d}:{s:05.2f}"
 
 
-def make_ass(scenes, durs, path, hook_text=""):
+def make_ass(scenes, durs, path, hook_text="", shot_labels=None):
     head = """[Script Info]
 ScriptType: v4.00+
 PlayResX: 1920
@@ -69,6 +69,7 @@ Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackC
 Style: Main,DejaVu Sans,62,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,4,1,2,120,120,90,1
 Style: Hook,DejaVu Sans,150,&H0000D6FF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,2,0,1,9,2,5,120,120,60,1
 Style: Chapter,DejaVu Sans,40,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,6,0,1,3,1,7,110,110,80,1
+Style: Source,DejaVu Sans,28,&H00FFFFFF,&H000000FF,&H80000000,&H80000000,1,0,0,0,100,100,0,0,3,2,0,7,90,90,50,1
 
 [Events]
 Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
@@ -107,6 +108,10 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
             lines.append(f"Dialogue: 1,{ass_time(t0 + 0.3)},{ass_time(t0 + 3.6)},Chapter,,0,0,0,,"
                          "{\\fad(300,500)}" + f"{i + 1:02d}  |  {title}")
         t0 += d
+    for start, end, label in (shot_labels or []):
+        safe = str(label).replace("{", "(").replace("}", ")")
+        if safe:
+            lines.append(f"Dialogue: 2,{ass_time(start)},{ass_time(end)},Source,,0,0,0,,{safe}")
     Path(path).write_text(head + "\n".join(lines) + "\n")
 
 
@@ -125,30 +130,75 @@ def _chord_expr(freqs):
     return "+".join(t)
 
 
-def make_music(total, out, wd):
-    """Real track from assets/music if present; otherwise a slow evolving chord pad that is audible
-    on small speakers (energy 110-800 Hz, chords change every ~11 s)."""
-    wd = Path(wd)
-    tracks = list((Path(__file__).resolve().parent.parent / "assets" / "music").glob("*.mp3"))
-    if tracks:
-        run(["ffmpeg", "-y", "-stream_loop", "-1", "-i", str(random.choice(tracks)), "-t", f"{total + 5}",
-             "-ar", "44100", "-ac", "2", str(out)])
-        return
-    seg = 14
-    order = [0, 1, 2, 3, 0]
-    cmd = ["ffmpeg", "-y"]
-    for c in order:
-        cmd += ["-f", "lavfi", "-i", f"aevalsrc='{_chord_expr(CHORDS[c])}':s=44100:d={seg}"]
-    chain, last = [], "[0:a]"
-    for k in range(1, len(order)):
-        lab = f"[x{k}]"
-        chain.append(f"{last}[{k}:a]acrossfade=d=3{lab}")
-        last = lab
-    chain.append(f"{last}lowpass=f=2600,aecho=0.8:0.6:700|1300:0.3|0.2,aformat=channel_layouts=stereo,"
-                 f"afade=t=in:d=0.5,afade=t=out:st=57:d=0.5[loop]")
-    run(cmd + ["-filter_complex", ";".join(chain), "-map", "[loop]", str(wd / "loop.wav")])
-    run(["ffmpeg", "-y", "-stream_loop", "-1", "-i", str(wd / "loop.wav"), "-t", f"{total + 5}", str(out)])
+def _music_mood(emotion):
+    e = (emotion or "").lower()
+    if any(k in e for k in ("suspense", "myster", "ominous", "hush", "eerie")):
+        return "suspense"
+    if any(k in e for k in ("urgent", "danger", "tense", "panic", "dread")):
+        return "tension"
+    if any(k in e for k in ("sad", "somber", "grief", "tragic", "tender", "hope", "warm")):
+        return "emotional"
+    if any(k in e for k in ("awe", "wonder", "discovery", "marvel", "triumph")):
+        return "wonder"
+    return "neutral"
 
+
+MUSIC_CHORDS = {
+    "suspense": [55.0, 82.41, 110.0, 130.81],
+    "tension": [49.0, 73.42, 98.0, 116.54],
+    "emotional": [65.41, 82.41, 98.0, 130.81],
+    "wonder": [130.81, 164.81, 196.0, 261.63],
+    "neutral": [110.0, 130.81, 164.81, 220.0],
+}
+
+
+def _scene_music_expr(mood):
+    freqs = MUSIC_CHORDS[mood]
+    base = _chord_expr(freqs)
+    if mood == "tension":
+        return f"0.7*({base})*(0.72+0.28*sin(2*PI*0.22*t))"
+    if mood == "suspense":
+        return f"0.65*({base})*(0.82+0.18*sin(2*PI*0.08*t))"
+    return f"0.58*({base})"
+
+
+def _music_track(mood, tracks):
+    named = [p for p in tracks if mood in p.stem.lower()]
+    if named:
+        return random.choice(named)
+    neutral = [p for p in tracks if any(k in p.stem.lower() for k in ("neutral", "ambient", "documentary"))]
+    return random.choice(neutral) if mood == "neutral" and neutral else None
+
+
+def make_music(total, out, wd, scenes=None, durs=None):
+    """Build a per-scene emotion bed from tagged licensed tracks or generated open-source synth."""
+    wd = Path(wd)
+    scenes = scenes or []
+    durs = durs or []
+    if not scenes or len(scenes) != len(durs):
+        scenes = [{"emotion": "neutral"}]
+        durs = [total]
+    tracks = list((Path(__file__).resolve().parent.parent / "assets" / "music").glob("*.mp3"))
+    cmd, filters, inputs = ["ffmpeg", "-y"], [], []
+    crossfade = min(0.8, max(0.0, min(durs) / 4 if durs else 0.0))
+    for i, (scene, duration) in enumerate(zip(scenes, durs)):
+        mood = _music_mood(scene.get("emotion"))
+        track = _music_track(mood, tracks)
+        segment = max(float(duration), 0.1) + crossfade
+        if track:
+            cmd += ["-stream_loop", "-1", "-i", str(track)]
+        else:
+            cmd += ["-f", "lavfi", "-i", f"aevalsrc='{_scene_music_expr(mood)}':s=44100:d={segment:.3f}"]
+        filters.append(f"[{i}:a]atrim=duration={segment:.3f},asetpts=PTS-STARTPTS,volume=0.32,"
+                       f"afade=t=in:st=0:d={min(0.35,segment/3):.3f}[s{i}]")
+        inputs.append(f"[s{i}]")
+    last = inputs[0]
+    for i in range(1, len(inputs)):
+        nxt = f"[x{i}]"
+        filters.append(f"{last}{inputs[i]}acrossfade=d={crossfade:.3f}:c1=tri:c2=tri{nxt}")
+        last = nxt
+    filters.append(f"{last}atrim=duration={total:.3f},afade=t=in:d=1,afade=t=out:st={max(total-3,0):.3f}:d=2[m]")
+    run(cmd + ["-filter_complex", ";".join(filters), "-map", "[m]", "-ar", "44100", str(out)])
 
 def make_whoosh(out):
     run(["ffmpeg", "-y", "-f", "lavfi", "-i", "anoisesrc=d=0.9:c=pink:r=44100:a=0.5",
@@ -186,15 +236,30 @@ def mix_audio(voice, music, whoosh, impact, starts, total, out):
     run(cmd)
 
 
+def _source_label(asset):
+    source = asset.get("source", "")
+    if "Generated context" in source:
+        return "ILLUSTRATIVE • CONTEXT"
+    if "Internet Archive" in source:
+        return "ARCHIVAL CLIP • INTERNET ARCHIVE"
+    if "Wikimedia" in source:
+        return "REFERENCE IMAGE • WIKIMEDIA"
+    if "NASA" in source:
+        return "NASA SOURCE"
+    return f"ILLUSTRATIVE • {source.upper()}" if source else "ILLUSTRATIVE"
+
+
 def assemble(scenes, durs, plans, assets_by_scene, voice, wd, out, hook_text=""):
-    """Render every shot, concat, burn titles/subtitles, mix sound design, mux."""
+    """Render every shot, label sources, burn captions, and mix sound design."""
     wd = Path(wd)
     shots, n, clock = [], 0, 0.0
+    shot_labels = []
     for plan, assets in zip(plans, assets_by_scene):
         for l, a in zip(plan, assets):
             o = wd / f"shot{n:04d}.mp4"
             render_shot(a, l, o, n, punch=clock < 10.0)      # push-in on every shot of the cold open
             shots.append(o)
+            shot_labels.append((clock, clock + l, _source_label(a)))
             clock += l
             n += 1
     (wd / "shots.txt").write_text("".join(f"file '{s.name}'\n" for s in shots))
@@ -203,8 +268,8 @@ def assemble(scenes, durs, plans, assets_by_scene, voice, wd, out, hook_text="")
     for d in durs:
         starts.append(t)
         t += d
-    make_ass(scenes, durs, wd / "subs.ass", hook_text)
-    make_music(total, wd / "music.wav", wd)
+    make_ass(scenes, durs, wd / "subs.ass", hook_text, shot_labels=shot_labels)
+    make_music(total, wd / "music.wav", wd, scenes=scenes, durs=durs)
     make_whoosh(wd / "whoosh.wav")
     make_impact(wd / "impact.wav")
     mix_audio(voice, wd / "music.wav", wd / "whoosh.wav", wd / "impact.wav", starts[1:], total, wd / "mix.wav")
