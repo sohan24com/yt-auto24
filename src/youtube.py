@@ -95,6 +95,13 @@ def retention_curve(vid, start, end):
         return []
 
 
+def add_comment(vid, text):
+    """Post a top-level full-video CTA comment. The Data API cannot pin comments."""
+    body = {"snippet": {"videoId": vid,
+                        "topLevelComment": {"snippet": {"textOriginal": text[:10000]}}}}
+    return yt().commentThreads().insert(part="snippet", body=body).execute()
+
+
 def localize(vid, localizations):
     """Add translated titles/descriptions; YouTube shows each viewer the one for their language."""
     yt().videos().update(part="localizations", body={"id": vid, "localizations": localizations}).execute()
