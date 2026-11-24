@@ -1,0 +1,85 @@
+{
+ "video_id": "UZvkOKxikvA",
+ "url": "https://youtu.be/UZvkOKxikvA",
+ "created": "2026-11-24T21:32:46.240671+00:00",
+ "day": 2,
+ "topic": "The Voynich Manuscript",
+ "angle": "Why has modern artificial intelligence failed to crack a mysterious 600-year-old cipher that human cryptographers have studied for centuries?",
+ "category": "history",
+ "title": "Why Centuries of Codebreakers Couldn't Solve This Cipher",
+ "title_b": "The 600-Year-Old Mystery That Defies AI Cryptography",
+ "thumb_ids": [
+  "10OFZ6OaovO_IHijF_5VwgwgZICnnPdm-",
+  "1WmgVdsNP0U6Th4f82dZNi_95zis6zxaM",
+  "1dzuuOUst2473dhA8QzMlIDcXrZ4ei0iz"
+ ],
+ "drive_video_id": "1srfBhjnICNPtrfIl0otTc5Xm42Z3FEeE",
+ "duration": 648,
+ "short_id": "ja9Nu1Ynymw",
+ "scenes": [
+  {
+   "title": "The Unbroken Code",
+   "start": 0
+  },
+  {
+   "title": "The Mondragone Discovery",
+   "start": 51
+  },
+  {
+   "title": "The Codebreakers",
+   "start": 110
+  },
+  {
+   "title": "The Architecture of Language",
+   "start": 174
+  },
+  {
+   "title": "The Hoax Debate",
+   "start": 229
+  },
+  {
+   "title": "The Algorithmic Promise",
+   "start": 273
+  },
+  {
+   "title": "The Hebrew Computer Fallacy",
+   "start": 331
+  },
+  {
+   "title": "The Illusion of Meaning",
+   "start": 379
+  },
+  {
+   "title": "The Missing Ground Truth",
+   "start": 433
+  },
+  {
+   "title": "Visual Anomalies",
+   "start": 490
+  },
+  {
+   "title": "The Limits of Machine Intelligence",
+   "start": 538
+  },
+  {
+   "title": "The Eternal Cipher",
+   "start": 593
+  }
+ ],
+ "fact_check_changes": [],
+ "swapped": false,
+ "snapshots": {},
+ "localized": [
+  "ar",
+  "bn",
+  "de",
+  "es",
+  "fr",
+  "hi",
+  "id",
+  "ja",
+  "pt",
+  "ru"
+ ],
+ "short_scene": "The Unbroken Code"
+}
