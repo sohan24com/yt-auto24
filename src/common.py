@@ -51,34 +51,49 @@ def extract_json(text):
     return json.loads(text[s:e + 1])
 
 
+# Keep this allowlist limited to models whose standard text API has a documented free tier.
+# Model discovery only decides which supported allowlisted IDs to try; it never enables paid IDs.
+FREE_GEMINI_MODELS = (
+    "gemini-3.6-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash-lite",
+)
+
 _MODELS = None
 
 
 def _model_list(key):
-    """Configured model first, then every Flash model the API currently offers (newest first)."""
+    """Return only known free-tier text models, preferring the configured free model."""
     global _MODELS
     if _MODELS:
         return _MODELS
     c = cfg()
-    found = []
+    available = set()
     try:
         r = requests.get("https://generativelanguage.googleapis.com/v1beta/models",
                          params={"key": key, "pageSize": 1000}, timeout=30)
-        for m in r.json().get("models", []):
-            name = m["name"].split("/")[-1]
-            mm = re.fullmatch(r"gemini-(\d+(?:\.\d+)?)-flash(-lite)?(-preview)?", name)
-            if mm and "generateContent" in m.get("supportedGenerationMethods", []):
-                found.append((-float(mm.group(1)), bool(mm.group(2)), bool(mm.group(3)), name))
-        found.sort()
+        r.raise_for_status()
+        for model in r.json().get("models", []):
+            name = model["name"].split("/")[-1]
+            if "generateContent" in model.get("supportedGenerationMethods", []):
+                available.add(name)
     except Exception as e:
-        print("model discovery failed:", e)
-    order = [c["gemini_model"]] + [f[3] for f in found] + list(c.get("gemini_fallbacks", [])) + ["gemini-flash-latest"]
+        print("model discovery failed:", type(e).__name__)
+
+    configured = [c.get("gemini_model", "")] + list(c.get("gemini_fallbacks", []))
+    order = [name for name in configured if name in FREE_GEMINI_MODELS]
+    order.extend(name for name in FREE_GEMINI_MODELS
+                 if not available or name in available)
     _MODELS = list(dict.fromkeys(order))
-    print("Gemini models to try:", _MODELS[:6])
+    print("Free Gemini text models to try:", _MODELS)
     return _MODELS
+class GeminiUnavailableError(RuntimeError):
+    """Raised after bounded attempts across the configured Gemini keys and models."""
 
 
-def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9, tries=16):
+def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
+           tries=None, request_timeout=90, total_timeout=300):
     body = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {"maxOutputTokens": 32000},
@@ -86,42 +101,89 @@ def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
     if system:
         body["systemInstruction"] = {"parts": [{"text": system}]}
     if grounding:
-        body["tools"] = [{"google_search": {}}]   # cannot be combined with JSON mime type
+        body["tools"] = [{"google_search": {}}]
     elif json_out:
         body["generationConfig"]["responseMimeType"] = "application/json"
-    keys = [k.strip() for k in (
+
+    keys = list(dict.fromkeys(k.strip() for k in (
         env("GEMINI_API_KEY", False), env("GEMINI_API_KEY_2", False),
         env("GEMINI_API_KEY_3", False), env("GEMINI_API_KEY_4", False),
         env("GEMINI_API_KEY_5", False),
-    ) if k and k.strip()]
+    ) if k and k.strip()))
     if not keys:
-        raise RuntimeError("No GEMINI_API_KEY set")
+        raise GeminiUnavailableError("No Gemini API keys are configured")
+
     models = _model_list(keys[0])
-    last, mi = "", 0
-    for n in range(tries):
-        model = models[mi % len(models)]
-        retry_delay = min(2 * (n + 1), 20)
-        gc = dict(body["generationConfig"])
-        if not model.startswith("gemini-3"):      # Gemini 3 works best at its default temperature
-            gc["temperature"] = temperature
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-        try:
-            r = requests.post(url, params={"key": keys[n % len(keys)]}, json=dict(body, generationConfig=gc), timeout=300)
-            if r.status_code == 200:
-                parts = r.json()["candidates"][0]["content"]["parts"]
-                text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
-                return extract_json(text) if json_out else text
-            last = f"{model}: {r.status_code} {r.text[:200]}"
-            mi += 1                                  # any API error -> try the next model (and next key)
-            print("Gemini error, switching:", last[:120])
-            if r.status_code in (429, 500, 502, 503, 504):
-                retry_delay = 2                     # rotate model/key quickly on rate limits or overload
-            if r.status_code in (404, 400):
-                continue                             # model gone/incompatible: no waiting needed
-        except Exception as ex:  # parse errors, timeouts: retry same model
-            last = repr(ex)
-        time.sleep(retry_delay)
-    raise RuntimeError(f"Gemini failed: {last}")
+    if not models:
+        raise GeminiUnavailableError("No Gemini models are available to try")
+
+    deadline = time.monotonic() + max(1.0, float(total_timeout))
+    attempts = 0
+    last = "no usable response"
+    status_counts = {}
+
+    for model in models:
+        overloaded = False
+        for key in keys:
+            if tries is not None and attempts >= tries:
+                break
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            attempts += 1
+            gc = dict(body["generationConfig"])
+            if not model.startswith("gemini-3"):
+                gc["temperature"] = temperature
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+            try:
+                r = requests.post(
+                    url, params={"key": key},
+                    json=dict(body, generationConfig=gc),
+                    timeout=min(float(request_timeout), remaining),
+                )
+                if r.status_code == 200:
+                    parts = r.json()["candidates"][0]["content"]["parts"]
+                    text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
+                    return extract_json(text) if json_out else text
+
+                status = int(r.status_code)
+                status_counts[status] = status_counts.get(status, 0) + 1
+                last = f"{model}: HTTP {status}"
+                print(f"Gemini candidate unavailable: {model} HTTP {status}")
+
+                if status == 503 or status in (500, 502, 504):
+                    # Capacity errors are model-wide; move to another model instead of
+                    # asking every account to hit the same overloaded endpoint.
+                    overloaded = True
+                    break
+                if status in (400, 404):
+                    # Invalid request/model: another key will not repair this candidate.
+                    break
+                if status in (401, 403, 429):
+                    # These may be key/project-specific, so rotate to the next distinct key.
+                    continue
+                if status >= 400:
+                    break
+            except requests.Timeout:
+                last = f"{model}: request timed out"
+                continue
+            except Exception as ex:
+                last = f"{model}: {type(ex).__name__}"
+                continue
+
+        if tries is not None and attempts >= tries:
+            break
+        if deadline - time.monotonic() <= 0:
+            break
+        if overloaded:
+            time.sleep(min(2.0, max(0.0, deadline - time.monotonic())))
+
+    summary = ", ".join(f"HTTP {code} x{count}" for code, count in sorted(status_counts.items()))
+    if not summary:
+        summary = f"{attempts} request attempt(s)"
+    raise GeminiUnavailableError(
+        f"Gemini unavailable after {attempts} bounded attempt(s) ({summary}); last response: {last}"
+    )
 
 
 # ---------- notifications ----------

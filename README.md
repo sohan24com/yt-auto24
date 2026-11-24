@@ -23,8 +23,9 @@ uploads media that fails the media probes.
    - On your PC: `cd tools && pip install google-auth-oauthlib && python get_tokens.py`, sign in with the YouTube
      channel's Google account, then add the printed values as secrets: `GOOGLE_CLIENT_ID`,
      `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_DRIVE_REFRESH_TOKEN` (run `get_tokens.py youtube`
-     and `get_tokens.py drive`). The YouTube scope now includes `youtube.force-ssl` for the optional Shorts comment;
-     after merging this feature, regenerate `GOOGLE_REFRESH_TOKEN` with the YouTube command.
+     and `get_tokens.py drive`). The existing YouTube token keeps upload and analytics working. To enable the optional
+     Shorts link comment, regenerate `GOOGLE_REFRESH_TOKEN` with `python get_tokens.py youtube` and update that
+     GitHub Actions secret. The new token is saved locally in an ignored file; the helper does not print its value.
 5. **Optional** Telegram alerts: secrets `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 6. **Optional music**: add only tracks you have rights to use under `assets/music/`. Name tracks with a mood word
    such as `suspense_01.mp3`, `tension_01.mp3`, `emotional_01.mp3`, `wonder_01.mp3`, or `neutral_01.mp3`.

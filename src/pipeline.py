@@ -71,13 +71,15 @@ def build_once(wd):
     topic = T.choose_topic()
     print("TOPIC:", topic)
     script = None
+    problems = []
     for _ in range(3):
-        script = S.write_script(topic)
-        if not S.valid(script):
+        script = S.write_script(topic, validation_feedback=problems)
+        problems = S.valid(script)
+        if not problems:
             break
-        print("script rejected:", S.valid(script))
+        print("script rejected:", problems)
     else:
-        raise RuntimeError("could not produce a valid script")
+        raise RuntimeError(f"could not produce a valid script: {problems}")
     checked = S.fact_check(script)
     for k in ("setting", "wiki_terms", "hook_text"):            # fact-check output may drop these
         checked[k] = script.get(k, checked.get(k))
