@@ -227,17 +227,16 @@ def validate_blueprint(blueprint, require_evidence=False):
         if not scene.get("story_purpose") or not scene.get("story_progress") or not scene.get("causal_link"):
             issues.append(f"story: scene {number} needs purpose, progression, and a cause/effect link")
         anchor = _tokens(scene.get("visual_anchor", ""))
-        visual_text = " ".join(str(value) for value in (
-            (scene.get("visual_plan") or {}).get("description", ""),
-            " ".join((scene.get("visual_plan") or {}).get("footage_keywords", []))
-            if isinstance((scene.get("visual_plan") or {}).get("footage_keywords", []), list) else "",
-        ))
+        visual = scene.get("visual_plan")
+        visual = visual if isinstance(visual, dict) else {}
+        keywords = visual.get("footage_keywords", [])
+        visual_text = " ".join((str(visual.get("description", "")),
+                                " ".join(keywords) if isinstance(keywords, list) else ""))
         if not anchor or not anchor <= (_tokens(narration) & _tokens(visual_text)):
             issues.append(f"storyboard: scene {number} visual anchor must occur in narration and planned visuals")
         missing = [field for field in PLAN_FIELDS if field not in scene]
         if missing:
             issues.append(f"storyboard: scene {number} missing " + ", ".join(missing))
-        visual = scene.get("visual_plan")
         if not isinstance(visual, dict) or required_visual - set(visual):
             issues.append(f"storyboard: scene {number} needs all visual, motion, sound, music and transition fields")
         elif (not visual.get("description") or not visual.get("camera_movement")
