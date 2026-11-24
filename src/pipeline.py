@@ -35,8 +35,14 @@ def media_problems(path, expected_duration=None, portrait=False, min_bytes=1 << 
     expected_size = (1080, 1920) if portrait else (1920, 1080)
     if (int(video.get("width", 0)), int(video.get("height", 0))) != expected_size:
         bad.append(f"wrong resolution: {video.get('width')}x{video.get('height')}")
-    vd = float(video.get("duration", duration))
-    ad = float(audio.get("duration", duration))
+    def stream_duration(stream):
+        try:
+            return float(stream.get("duration", duration))
+        except (TypeError, ValueError):
+            return duration
+
+    vd = stream_duration(video)
+    ad = stream_duration(audio)
     if abs(vd - ad) > 1.0:
         bad.append(f"audio/video duration mismatch: {ad:.2f}s vs {vd:.2f}s")
     if expected_duration is not None and abs(duration - expected_duration) > 1.5:
