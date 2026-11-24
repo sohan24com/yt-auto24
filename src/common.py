@@ -188,8 +188,8 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
 
 GROQ_MODELS = (
     "openai/gpt-oss-20b",
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.8-27b",
 )
 
 
@@ -248,11 +248,11 @@ def _groq(prompt, system=None, json_out=True, temperature=0.9,
                 status_counts[status] = status_counts.get(status, 0) + 1
                 last = f"{model}: HTTP {status}"
                 print(f"Groq candidate unavailable: {model} HTTP {status}")
-                if status in (401, 403, 429):
-                    # Keys can belong to different organizations; same-org keys still
-                    # share the organization's rate limit.
+                if status in (401, 403):
+                    # Rotate a rejected credential; do not log or expose its value.
                     continue
-                # Invalid request or provider capacity issue: move to another model.
+                # A 429/capacity error moves to another model without replaying the
+                # same organization's shared quota through another key.
                 break
             except requests.Timeout:
                 last = f"{model}: request timed out"
