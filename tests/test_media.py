@@ -60,11 +60,13 @@ class PipelineTests(unittest.TestCase):
                 {"name": "models/gemini-3.1-flash-tts-preview", "supportedGenerationMethods": ["generateContent"]},
             ]
         }
-        with patch("src.common.cfg", return_value={
+        with (
+            patch("src.common.cfg", return_value={
                 "gemini_model": "gemini-3.8-flash",
-                "gemini_fallbacks": ["gemini-3.7-flash", "gemini-3.5-flash"]}), \\
-             patch("src.common.requests.get", return_value=SimpleNamespace(
-                 json=lambda: api_models, raise_for_status=lambda: None)):
+                "gemini_fallbacks": ["gemini-3.7-flash", "gemini-3.5-flash"]}),
+            patch("src.common.requests.get", return_value=SimpleNamespace(
+                json=lambda: api_models, raise_for_status=lambda: None)),
+        ):
             models = common._model_list("test-key")
         self.assertEqual(["gemini-3.6-flash", "gemini-2.5-flash-lite"], models)
         common._MODELS = None
