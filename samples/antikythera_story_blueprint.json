@@ -107,7 +107,7 @@
       "pattern_interrupt": "Macro gear snap-zoom with a single metallic impact.",
       "story_purpose": "Cold-open with the documented capability; immediately ask how.",
       "visual_plan": {
-        "description": "A real fragment photograph, clearly labeled as the surviving artifact, then a restrained gear silhouette.",
+        "description": "A real fragment photograph, clearly labeled as the surviving artifact, then a restrained gear silhouette showing the eclipse calculator.",
         "camera_movement": "Fast push-in, then hold.",
         "footage_keywords": [
           "Antikythera fragment",
@@ -119,7 +119,9 @@
         "music_mood": "suspense",
         "transition": "Hard cut."
       },
-      "target_duration_seconds": 4
+      "target_duration_seconds": 4,
+      "causal_link": "The claim that this was an eclipse calculator creates the central how-question.",
+      "visual_anchor": "eclipses"
     },
     {
       "number": 2,
@@ -149,7 +151,9 @@
         "music_mood": "mystery",
         "transition": "Map-line wipe."
       },
-      "target_duration_seconds": 24
+      "target_duration_seconds": 24,
+      "causal_link": "Because divers found it in wreck material, its survival is tied to a specific archaeological context.",
+      "visual_anchor": "Antikythera"
     },
     {
       "number": 3,
@@ -179,7 +183,9 @@
         "music_mood": "curiosity",
         "transition": "Match cut to engraved lettering."
       },
-      "target_duration_seconds": 29
+      "target_duration_seconds": 29,
+      "causal_link": "Because the bronze is corroded and tiny writing is hard to read, surface inspection alone is not enough.",
+      "visual_anchor": "corroded"
     },
     {
       "number": 4,
@@ -209,7 +215,9 @@
         "music_mood": "somber",
         "transition": "Cut on the last fragment."
       },
-      "target_duration_seconds": 31
+      "target_duration_seconds": 31,
+      "causal_link": "Because only a fraction survives, every reconstruction must account for missing pieces.",
+      "visual_anchor": "fragments"
     },
     {
       "number": 5,
@@ -239,7 +247,9 @@
         "music_mood": "suspense",
         "transition": "X-ray flash to lab."
       },
-      "target_duration_seconds": 30
+      "target_duration_seconds": 30,
+      "causal_link": "The missing context leads to the practical question of how researchers could inspect the fragments.",
+      "visual_anchor": "fragment"
     },
     {
       "number": 6,
@@ -270,7 +280,9 @@
         "music_mood": "investigative",
         "transition": "Wipe through scan slice."
       },
-      "target_duration_seconds": 33
+      "target_duration_seconds": 33,
+      "causal_link": "Tomography supplies the hidden detail needed to move from mystery to measurable structure.",
+      "visual_anchor": "tomography"
     },
     {
       "number": 7,
@@ -300,7 +312,9 @@
         "music_mood": "wonder",
         "transition": "Rotating dial match cut."
       },
-      "target_duration_seconds": 32
+      "target_duration_seconds": 32,
+      "causal_link": "The imaging turns the rear dials into interpretable repeating cycles.",
+      "visual_anchor": "dials"
     },
     {
       "number": 8,
@@ -332,7 +346,9 @@
         "music_mood": "revelation",
         "transition": "Eclipse wipe."
       },
-      "target_duration_seconds": 34
+      "target_duration_seconds": 34,
+      "causal_link": "Those measured cycles explain the eclipse-prediction capability promised in the hook.",
+      "visual_anchor": "eclipse"
     },
     {
       "number": 9,
@@ -364,7 +380,9 @@
         "music_mood": "mystery",
         "transition": "Cut from letters to gears."
       },
-      "target_duration_seconds": 31
+      "target_duration_seconds": 31,
+      "causal_link": "Once the rear functions are understood, the inscriptions raise a wider question about the front.",
+      "visual_anchor": "inscriptions"
     },
     {
       "number": 10,
@@ -394,7 +412,9 @@
         "music_mood": "wonder",
         "transition": "Layer stack dissolves."
       },
-      "target_duration_seconds": 33
+      "target_duration_seconds": 33,
+      "causal_link": "The planetary inscriptions motivate a proposed model, while its status must stay qualified.",
+      "visual_anchor": "model"
     },
     {
       "number": 11,
@@ -424,7 +444,9 @@
         "music_mood": "investigative",
         "transition": "Three-panel merge."
       },
-      "target_duration_seconds": 34
+      "target_duration_seconds": 34,
+      "causal_link": "The model is constrained by multiple kinds of evidence rather than one attractive animation.",
+      "visual_anchor": "evidence"
     },
     {
       "number": 12,
@@ -455,7 +477,9 @@
         "music_mood": "reflection",
         "transition": "Soft dissolve."
       },
-      "target_duration_seconds": 31
+      "target_duration_seconds": 31,
+      "causal_link": "Because some clues are missing, the audience needs a clear boundary between fit and proof.",
+      "visual_anchor": "model"
     },
     {
       "number": 13,
@@ -485,7 +509,9 @@
         "music_mood": "tension",
         "transition": "Dashed lines fade."
       },
-      "target_duration_seconds": 30
+      "target_duration_seconds": 30,
+      "causal_link": "That boundary becomes essential when the authors identify the missing direct evidence.",
+      "visual_anchor": "fragments"
     },
     {
       "number": 14,
@@ -517,7 +543,9 @@
         "music_mood": "resolution",
         "transition": "Match dissolve."
       },
-      "target_duration_seconds": 32
+      "target_duration_seconds": 32,
+      "causal_link": "The missing evidence means the proposed display answers possibility, not exact original construction.",
+      "visual_anchor": "model"
     },
     {
       "number": 15,
@@ -535,7 +563,7 @@
       "pattern_interrupt": "",
       "story_purpose": "Separate functional evidence from broader unanswered historical questions.",
       "visual_plan": {
-        "description": "Artifact in museum context, with no invented portrait of its maker.",
+        "description": "Museum setting frames open questions about purpose without inventing a maker.",
         "camera_movement": "Slow pull-back into darkness.",
         "footage_keywords": [
           "museum artifact display",
@@ -547,7 +575,9 @@
         "music_mood": "reflective",
         "transition": "Fade to artifact."
       },
-      "target_duration_seconds": 30
+      "target_duration_seconds": 30,
+      "causal_link": "Resolving the technical question leaves the historical purpose open.",
+      "visual_anchor": "purpose"
     },
     {
       "number": 16,
@@ -578,7 +608,9 @@
         "music_mood": "emotional wonder",
         "transition": "Gear-to-star dissolve."
       },
-      "target_duration_seconds": 34
+      "target_duration_seconds": 34,
+      "causal_link": "This careful limit makes the demonstrated gear-and-cycle achievement more meaningful.",
+      "visual_anchor": "gears"
     },
     {
       "number": 17,
@@ -597,7 +629,7 @@
       "pattern_interrupt": "",
       "story_purpose": "Return to the opening and state the complete, nuanced answer.",
       "visual_plan": {
-        "description": "Cycle animation resolves into the surviving fragment; label diagram as explanatory.",
+        "description": "Cycle animation resolves into the surviving fragment; label the eclipse cycle diagram as explanatory.",
         "camera_movement": "Push from orbit diagram back to artifact.",
         "footage_keywords": [
           "eclipse cycle diagram",
@@ -609,7 +641,9 @@
         "music_mood": "satisfying",
         "transition": "Slow fade."
       },
-      "target_duration_seconds": 35
+      "target_duration_seconds": 35,
+      "causal_link": "The final explanation returns to the opening question and states both the mechanism and its limit.",
+      "visual_anchor": "cycle"
     },
     {
       "number": 18,
@@ -625,7 +659,7 @@
       "pattern_interrupt": "",
       "story_purpose": "Short natural CTA after the story has reached a satisfying conclusion.",
       "visual_plan": {
-        "description": "Quiet artifact end card with space for a related documentary card; no fabricated thumbnail.",
+        "description": "Quiet machine end card with space for a related documentary card; no fabricated thumbnail.",
         "camera_movement": "Gentle pull-out.",
         "footage_keywords": [
           "museum artifact end card",
@@ -636,7 +670,9 @@
         "music_mood": "warm outro",
         "transition": "Fade out."
       },
-      "target_duration_seconds": 25
+      "target_duration_seconds": 25,
+      "causal_link": "After the resolved answer, a short invitation connects this machine story to the next documentary.",
+      "visual_anchor": "machine"
     }
   ],
   "limitations": [
