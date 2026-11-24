@@ -107,7 +107,7 @@
       "pattern_interrupt": "Macro gear snap-zoom with a single metallic impact.",
       "story_purpose": "Cold-open with the documented capability; immediately ask how.",
       "visual_plan": {
-        "description": "A real fragment photograph, clearly labeled as the surviving artifact, then a restrained gear silhouette showing the eclipse calculator.",
+        "description": "A real fragment photograph, clearly labeled as a surviving eclipse-predicting machine, then a restrained gear silhouette.",
         "camera_movement": "Fast push-in, then hold.",
         "footage_keywords": [
           "Antikythera fragment",
@@ -300,7 +300,7 @@
       "pattern_interrupt": "Animate one ring turning as the rest of the frame freezes.",
       "story_purpose": "Explain how cyclical motion can encode astronomical time.",
       "visual_plan": {
-        "description": "Back-dial evidence image, with any clean dial overlay labeled as a diagram.",
+        "description": "Back dials evidence image, with any clean dial overlay labeled as a diagram.",
         "camera_movement": "Orbit around a flat dial graphic.",
         "footage_keywords": [
           "Antikythera back dial",
@@ -334,7 +334,7 @@
       "pattern_interrupt": "Eclipse shadow crosses a clean cycle chart.",
       "story_purpose": "Pay off L1 with the documented mechanism, carefully attributed.",
       "visual_plan": {
-        "description": "Research-backed eclipse-cycle diagram; mark the graphic as an explanatory animation, not original footage.",
+        "description": "Research-backed eclipse-cycle diagram explains recurring cycles; mark the graphic as an explanatory animation, not original footage.",
         "camera_movement": "Track along numbered cycle marks.",
         "footage_keywords": [
           "lunar eclipse animation",
@@ -629,7 +629,7 @@
       "pattern_interrupt": "",
       "story_purpose": "Return to the opening and state the complete, nuanced answer.",
       "visual_plan": {
-        "description": "Cycle animation resolves into the surviving fragment; label the eclipse cycle diagram as explanatory.",
+        "description": "Cycle animation resolves into the surviving fragment; label the explanatory cycles diagram.",
         "camera_movement": "Push from orbit diagram back to artifact.",
         "footage_keywords": [
           "eclipse cycle diagram",
@@ -643,7 +643,7 @@
       },
       "target_duration_seconds": 35,
       "causal_link": "The final explanation returns to the opening question and states both the mechanism and its limit.",
-      "visual_anchor": "cycle"
+      "visual_anchor": "cycles"
     },
     {
       "number": 18,
