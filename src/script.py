@@ -141,11 +141,18 @@ def _fact_check_note(record):
     return "not search-verified for this run; factual claims need editorial review."
 
 
-def make_metadata(topic, scenes_with_times, sources, credits, fact_check=None):
+def make_metadata(topic, scenes_with_times, sources, credits, fact_check=None, story_blueprint=None):
     chapters = "\n".join(f"{t} {s['title']}" for t, s in scenes_with_times)
     outline = "; ".join(s["title"] for _, s in scenes_with_times)
+    story_context = ""
+    if story_blueprint:
+        story_context = (f"Supported title promise: {story_blueprint.get('title_promise', '')}\\n"
+                         f"Central question: {story_blueprint.get('central_question', '')}\\n"
+                         f"Opening hook: {story_blueprint.get('scenes', [{}])[0].get('narration', '')}\\n")
     prompt = f"""Create honest YouTube packaging for this researched documentary.
 Topic: {topic['topic']} | Angle: {topic['angle']} | Chapters: {outline}
+{story_context}
+The title and at least one thumbnail text must match the supported title promise and opening hook.
 1) Write 10 truthful title candidates (max 65 chars). Claims must be supported by the topic and chapter facts.
 2) Give 3 distinct thumbnail texts (2-4 words), each traceable to the topic, angle, or chapter names. No invented claim.
 3) Write a description: 2 punchy opening lines, then 2 short accurate paragraphs. Do NOT include chapters or sources.
@@ -194,13 +201,24 @@ Return JSON: {{"titles":[{{"title":"","curiosity":0,"clarity":0,"honesty":0}}],"
         if not (2 <= len(words) <= 4 and claims and claims <= anchors):
             text = fallback_texts[i] or str(topic.get("topic", "DOCUMENTARY"))[:24]
         thumb_texts.append(text.upper())
-    return {
+    packaged = {
         "title": str(titles[0].get("title") or topic.get("topic", "Documentary"))[:100],
         "title_b": str((titles[1] if len(titles) > 1 else titles[0]).get("title") or topic.get("topic", "Documentary"))[:100],
         "thumb_texts": thumb_texts,
         "description": desc[:4900],
         "tags": m.get("tags", ["documentary", "research"])[:15],
     }
+    if story_blueprint:
+        from .story import validate_packaging
+        if validate_packaging(story_blueprint, packaged):
+            # Safe, literal fallback uses the script's own evidence-bounded promise.
+            promise_words = _fallback_terms(story_blueprint.get("title_promise", ""), 4)
+            packaged["title"] = str(story_blueprint.get("title_promise", topic.get("topic", "Documentary")))[:100]
+            promise_text = " ".join(promise_words[:3]).upper()
+            packaged["thumb_texts"][0] = promise_text or str(topic.get("topic", "DOCUMENTARY"))[:24].upper()
+            if validate_packaging(story_blueprint, packaged):
+                raise ValueError("generated title/thumbnail cannot be aligned to the story promise")
+    return packaged
 
 def beats(scenes, durs, plans):
     """Split each scene's narration across its shots, in proportion to shot length -> text spoken during each shot."""
