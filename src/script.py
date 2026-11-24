@@ -15,12 +15,13 @@ Topic: {topic['topic']}
 Angle: {topic['angle']}
 
 STRUCTURE
-- Scene 1 is the COLD OPEN, max 28 words (about 10 seconds spoken). Its FIRST sentence must be the most startling,
-  specific, TRUE fact or question of the whole story, with a concrete image (a number, a place, a date, an object).
-  No greeting, no "welcome", no channel intro, no throat-clearing. End it on a cliffhanger that makes leaving impossible.
-  Also give "hook_text": 3-5 ALL-CAPS words shown big on screen in the first seconds (e.g. "WHERE ARE THEY?").
-- Then 10-12 more scenes. Every second scene must end with an OPEN LOOP (a question answered later).
-- Final scene: the payoff, a thought-provoking close, one short line inviting viewers to subscribe for the next story.
+- Scene 1 starts immediately with a truthful, source-checkable hook that can be spoken in 5 seconds (max 12 words).
+  The FIRST sentence must use a concrete, story-specific fact or question; no invented numbers, greetings, welcome,
+  channel introduction, or throat-clearing. Leave a real unresolved question for the story to answer.
+  Give "hook_text": 3-5 short ALL-CAPS words that accurately summarize this hook.
+- Follow with 10-12 scenes that build a clear cause-and-effect story; use an open loop only when the next scene answers it.
+- Final scene delivers the researched payoff, then a natural outro thanking viewers, inviting Like/Comment/Subscribe,
+  and pointing to the next related documentary without inventing a specific video title or link.
 DELIVERY
 - For every scene give "emotion": a short voice-acting direction that matches what happens in it, e.g.
   "hushed, suspenseful", "somber, slow", "awed, rising", "urgent, tense", "calm, matter-of-fact", "warm, reflective".
@@ -72,8 +73,13 @@ def valid(script):
         problems.append("too few scenes")
     if not (v["words_min"] * 0.9 <= w <= v["words_max"] * 1.1):
         problems.append(f"word count {w}")
-    if sc and len(sc[0]["narration"].split()) > 60:
-        problems.append("hook too long")
+    if sc and len(sc[0]["narration"].split()) > 16:
+        problems.append("5-second hook too long")
+    hook = str(script.get("hook_text", "")).split()
+    if not 3 <= len(hook) <= 5:
+        problems.append("hook_text must contain 3-5 words")
+    if not sc or len(sc[-1].get("narration", "").split()) < 20:
+        problems.append("missing documentary outro/payoff")
     return problems
 
 
