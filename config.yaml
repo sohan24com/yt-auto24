@@ -9,8 +9,8 @@ videos_per_day: 2
 # starting mix; analytics.py shifts it toward what actually performs
 category_mix: {mystery: 0.7, history: 0.2, science: 0.1}
 
-gemini_model: "gemini-3.8-flash"
-gemini_fallbacks: ["gemini-3.7-flash", "gemini-3.5-flash"]   # used automatically if a model returns 404
+gemini_model: "gemini-3.6-flash"
+gemini_fallbacks: ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite"] # free-tier text models
 
 video:
   words_min: 1150
