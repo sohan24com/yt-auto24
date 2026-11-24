@@ -76,9 +76,10 @@ def valid(script):
     # The hook is the opening sentence. Later narration in Scene 1 must not
     # make a correctly sized five-second hook fail validation.
     if sc:
-        import re
         opening = str(sc[0].get("narration", "")).strip()
-        first_sentence = re.split(r"(?<=[.!?])\\s+", opening, maxsplit=1)[0]
+        ends = [opening.find(mark) for mark in ".?!"]
+        ends = [index for index in ends if index >= 0]
+        first_sentence = opening[:min(ends) + 1] if ends else opening
         if len(first_sentence.split()) > 12:
             problems.append("5-second hook too long (max 12 words in opening sentence)")
     hook = str(script.get("hook_text", "")).split()
