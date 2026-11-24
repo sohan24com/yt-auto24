@@ -143,16 +143,16 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
         if i > 0:
             title = sc.get("title", "").upper().replace("{", "(").replace("}", ")")
             plan = sc.get("visual_plan", {})
-        animation = str(plan.get("animation", "")).lower() if isinstance(plan, dict) else ""
-        reveal = str(sc.get("information_reveal", "")).strip()
-        label = f"{i + 1:02d}  |  {title}"
-        if reveal and any(word in animation for word in ("label", "text", "graphic", "diagram", "callout")):
-            short_reveal = " ".join(reveal.split()[:6]).upper().replace("{", "(").replace("}", ")")
-            label += "\\N" + short_reveal
-        transition = str(plan.get("transition", "")).lower() if isinstance(plan, dict) else ""
-        fade_in = "150" if "flash" in transition else "300"
-        lines.append(f"Dialogue: 1,{ass_time(t0 + 0.3)},{ass_time(t0 + 3.6)},Chapter,,0,0,0,,"
-                     + f"{{\\fad({fade_in},500)}}{label}")
+            animation = str(plan.get("animation", "")).lower() if isinstance(plan, dict) else ""
+            reveal = str(sc.get("information_reveal", "")).strip()
+            label = f"{i + 1:02d}  |  {title}"
+            if reveal and any(word in animation for word in ("label", "text", "graphic", "diagram", "callout")):
+                short_reveal = " ".join(reveal.split()[:6]).upper().replace("{", "(").replace("}", ")")
+                label += "\\N" + short_reveal
+            transition = str(plan.get("transition", "")).lower() if isinstance(plan, dict) else ""
+            fade_in = "150" if "flash" in transition else "300"
+            lines.append(f"Dialogue: 1,{ass_time(t0 + 0.3)},{ass_time(t0 + 3.6)},Chapter,,0,0,0,,"
+                         + f"{{\\fad({fade_in},500)}}{label}")
         t0 += d
     for start, end, label in (shot_labels or []):
         safe = str(label).replace("{", "(").replace("}", ")")
