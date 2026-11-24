@@ -99,7 +99,7 @@ class StoryBlueprintTests(unittest.TestCase):
             edit.make_ass(scenes, [4.0, 25.0], path)
             text = path.read_text(encoding="utf-8")
             self.assertIn("THE FULL GEAR COUNT REMAINS UNCERTAIN", text)
-            self.assertIn(r"{\\fad(150,500)}", text)
+            self.assertIn(r"{\fad(150,500)}", text)
 
     def test_story_camera_pan_renders_with_ffmpeg(self):
         import shutil
