@@ -45,6 +45,9 @@ def normalize_evidence(result, scene_count):
         })
     if not rows:
         return [], "no valid HTTPS claim-to-source rows"
+    required_scenes = min(int(scene_count), 8)
+    if len({row["scene"] for row in rows}) < required_scenes:
+        return [], f"claim evidence covers fewer than {required_scenes} story scenes"
     return rows, None
 
 
