@@ -42,12 +42,12 @@ def gate(final, total, reuse, asset_manifest=None):
             bad.append(f"asset license URL is missing: {label}")
     return bad
 
-def build_once(wd):
+def build_once(wd, validation_feedback=None):
     F.reset()
     topic = T.choose_topic()
     print("TOPIC:", topic)
     script = None
-    problems = []
+    problems = list(validation_feedback or [])
     for _ in range(3):
         script = S.write_script(topic, validation_feedback=problems)
         problems = S.valid(script)
@@ -257,12 +257,15 @@ def main():
 
     wd = tempfile.mkdtemp(prefix="doc_")
     try:
+        validation_feedback = []
         for attempt in range(1, 4):
             shutil.rmtree(wd, ignore_errors=True)
             Path(wd).mkdir()
-            topic, script, scenes, durs, starts, final, total, problems = build_once(wd)
+            topic, script, scenes, durs, starts, final, total, problems = build_once(
+                wd, validation_feedback=validation_feedback)
             if not problems:
                 break
+            validation_feedback = list(problems)
             print(f"QUALITY GATE failed (attempt {attempt}):", problems)
         else:
             raise RuntimeError(f"quality gate failed 3x: {problems}")
