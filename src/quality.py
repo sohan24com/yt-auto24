@@ -91,7 +91,7 @@ def validate_video(path, expected_duration=None, portrait=False, min_bytes=1 << 
         vd = ad = duration
     if abs(vd - ad) > 1.0:
         issues.append(f"audio/video duration mismatch: {ad:.2f}s vs {vd:.2f}s")
-    if not audio.get("sample_rate") or not audio.get("channels"):
+    if ("sample_rate" in audio and not audio.get("sample_rate")) or ("channels" in audio and not audio.get("channels")):
         issues.append("audio stream has no sample rate or channels")
     if not deep:
         return issues
