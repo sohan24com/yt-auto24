@@ -5,7 +5,7 @@ import subprocess
 def _moment_score(scene, index, last_index):
     text = str(scene.get("narration", "")).lower()
     emotion = str(scene.get("emotion", "")).lower()
-    if index == last_index or len(text.split()) < 35:
+    if index == last_index or len(text.split()) < 20:
         return -1
     score = 0
     for marker in ("?", "but ", "yet ", "until ", "instead ", "vanished", "discovered", "survived",
