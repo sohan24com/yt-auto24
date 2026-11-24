@@ -100,6 +100,7 @@ def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
     last, mi = "", 0
     for n in range(tries):
         model = models[mi % len(models)]
+        retry_delay = min(2 * (n + 1), 20)
         gc = dict(body["generationConfig"])
         if not model.startswith("gemini-3"):      # Gemini 3 works best at its default temperature
             gc["temperature"] = temperature
@@ -113,11 +114,13 @@ def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
             last = f"{model}: {r.status_code} {r.text[:200]}"
             mi += 1                                  # any API error -> try the next model (and next key)
             print("Gemini error, switching:", last[:120])
+            if r.status_code in (429, 500, 502, 503, 504):
+                retry_delay = 2                     # rotate model/key quickly on rate limits or overload
             if r.status_code in (404, 400):
                 continue                             # model gone/incompatible: no waiting needed
         except Exception as ex:  # parse errors, timeouts: retry same model
             last = repr(ex)
-        time.sleep(min(6 * (n + 1), 45))
+        time.sleep(retry_delay)
     raise RuntimeError(f"Gemini failed: {last}")
 
 
