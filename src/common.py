@@ -181,8 +181,106 @@ def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
     summary = ", ".join(f"HTTP {code} x{count}" for code, count in sorted(status_counts.items()))
     if not summary:
         summary = f"{attempts} request attempt(s)"
-    raise GeminiUnavailableError(
+    gemini_error = GeminiUnavailableError(
         f"Gemini unavailable after {attempts} bounded attempt(s) ({summary}); last response: {last}"
+    )
+    if grounding:
+        raise gemini_error
+
+    # Groq is a text-generation fallback only. Google Search grounding is Gemini-only.
+    try:
+        return _groq(prompt, system=system, json_out=json_out, temperature=temperature)
+    except GroqUnavailableError as groq_error:
+        if str(groq_error) == "No Groq API keys are configured":
+            raise gemini_error
+        raise GeminiUnavailableError(
+            f"{gemini_error}; Groq fallback also failed: {groq_error}"
+        ) from groq_error
+
+
+GROQ_MODELS = (
+    "openai/gpt-oss-20b",
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+)
+
+
+class GroqUnavailableError(RuntimeError):
+    """Raised after bounded attempts across configured Groq API keys and models."""
+
+
+def _groq(prompt, system=None, json_out=True, temperature=0.9,
+          request_timeout=20, total_timeout=90):
+    keys = list(dict.fromkeys(k.strip() for k in (
+        env("GROQ_API_KEY", False), env("GROQ_API_KEY_2", False),
+    ) if k and k.strip()))
+    if not keys:
+        raise GroqUnavailableError("No Groq API keys are configured")
+
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
+    deadline = time.monotonic() + max(1.0, float(total_timeout))
+    attempts = 0
+    status_counts = {}
+    last = "no usable response"
+
+    for model in GROQ_MODELS:
+        for key in keys:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            attempts += 1
+            payload = {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_completion_tokens": 4096,
+            }
+            if json_out:
+                payload["response_format"] = {"type": "json_object"}
+            try:
+                response = requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {key}",
+                             "Content-Type": "application/json"},
+                    json=payload,
+                    timeout=min(float(request_timeout), remaining),
+                )
+                if response.status_code == 200:
+                    content = response.json()["choices"][0]["message"].get("content") or ""
+                    if not content.strip():
+                        last = f"{model}: empty response"
+                        continue
+                    return extract_json(content) if json_out else content
+
+                status = int(response.status_code)
+                status_counts[status] = status_counts.get(status, 0) + 1
+                last = f"{model}: HTTP {status}"
+                print(f"Groq candidate unavailable: {model} HTTP {status}")
+                if status in (401, 403, 429):
+                    # Keys can belong to different organizations; same-org keys still
+                    # share the organization's rate limit.
+                    continue
+                # Invalid request or provider capacity issue: move to another model.
+                break
+            except requests.Timeout:
+                last = f"{model}: request timed out"
+                continue
+            except Exception as ex:
+                last = f"{model}: {type(ex).__name__}"
+                continue
+
+        if deadline - time.monotonic() <= 0:
+            break
+
+    summary = ", ".join(f"HTTP {code} x{count}" for code, count in sorted(status_counts.items()))
+    if not summary:
+        summary = f"{attempts} request attempt(s)"
+    raise GroqUnavailableError(
+        f"Groq unavailable after {attempts} bounded attempt(s) ({summary}); last response: {last}"
     )
 
 
