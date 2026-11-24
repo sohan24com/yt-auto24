@@ -289,11 +289,11 @@ def _cloudflare(prompt, system=None, json_out=True, temperature=0.9,
     if system:
         instruction = system
         if json_out:
-            instruction += "\\nReturn valid JSON only, with no Markdown fences or extra text."
+            instruction += "\nReturn valid JSON only, with no Markdown fences or extra text."
         messages.append({"role": "system", "content": instruction})
     user_prompt = prompt
     if json_out and not system:
-        user_prompt += "\\nReturn valid JSON only, with no Markdown fences or extra text."
+        user_prompt += "\nReturn valid JSON only, with no Markdown fences or extra text."
     messages.append({"role": "user", "content": user_prompt})
 
     url = (f"https://api.cloudflare.com/client/v4/accounts/{account_id}"
