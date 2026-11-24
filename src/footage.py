@@ -2,7 +2,8 @@
 One search query per SHOT (written from the sentence spoken during that shot), results re-ranked by how well
 their tags/title match the query, plus real photos of real places from Wikimedia Commons (CC0 / public
 domain / CC BY only, with attribution added to the description)."""
-import html, os, random, re, requests, time
+import hashlib, html, os, random, re, requests, time
+from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 from urllib.parse import quote
 
@@ -231,60 +232,107 @@ def _try(cands, q, used, wd, min_score):
         if dest.exists() or _download(url, dest):
             used.add(uid)
             credits.add(source)
-            a = {"path": dest, "kind": kind, "reused": False, "source": source}
+            a = {"path": dest, "kind": kind, "reused": False, "source": source,
+                 "match_words": _words(q + " " + text), "match_score": _score(q, text)}
             _all.append(a)
             return a
     return None
 
 
+def _context_card(query, beat, setting, wd):
+    """Relevant, visibly labeled graphic fallback; never substitute unrelated stock."""
+    key = hashlib.sha1(f"{query}|{beat}|{setting}".encode("utf-8")).hexdigest()[:12]
+    dest = Path(wd) / f"context-{key}.png"
+    if not dest.exists():
+        w, h = 1920, 1080
+        im = Image.new("RGB", (w, h))
+        px = im.load()
+        for y in range(h):
+            shade = int(12 + 23 * (1 - y / h))
+            for x in range(w):
+                glow = int(18 * (1 - x / w))
+                px[x, y] = (shade + glow, shade + glow + 5, shade + glow + 16)
+        d = ImageDraw.Draw(im)
+        try:
+            font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+            label_font = ImageFont.truetype(font_path, 36)
+            title_font = ImageFont.truetype(font_path, 82)
+            body_font = ImageFont.truetype(font_path, 38)
+        except OSError:
+            label_font = title_font = body_font = ImageFont.load_default()
+        d.rounded_rectangle((112, 100, 740, 164), radius=18, fill=(165, 93, 28))
+        d.text((140, 111), "ILLUSTRATIVE CONTEXT", font=label_font, fill=(255, 255, 255))
+        title = " ".join((query or setting or "Documentary context").split()[:8])
+        d.text((112, 265), title[:64], font=title_font, fill=(245, 230, 184))
+        excerpt = " ".join((beat or "").split())
+        lines, line = [], ""
+        for word in excerpt.split():
+            candidate = (line + " " + word).strip()
+            if d.textlength(candidate, font=body_font) > 1500 and line:
+                lines.append(line)
+                line = word
+            else:
+                line = candidate
+        if line:
+            lines.append(line)
+        for i, row in enumerate(lines[:5]):
+            d.text((120, 430 + i * 58), row, font=body_font, fill=(210, 216, 225))
+        d.line((112, 850, 1808, 850), fill=(184, 129, 52), width=3)
+        d.text((112, 885), f"Place / period: {setting or 'context from narration'}",
+               font=label_font, fill=(188, 198, 214))
+        im.save(dest)
+    return {"path": dest, "kind": "image", "reused": False, "source": "Generated context card",
+            "match_words": _words(query + " " + beat + " " + setting), "match_score": 0,
+            "is_context_fallback": True}
+
+
 def gather_shot(q, alt, beat, setting, used, wd, wiki, wiki_cap=0.3, total_shots=100):
-    """Best asset for ONE shot. Order: real Wikimedia photo if the narration names it, then stock footage whose
-    tags match the query, then looser matches, then generic atmosphere."""
+    """Find a semantically related asset or create a labeled context graphic."""
     bw = _words(beat)
+    qwords = _words(q + " " + alt)
+    target = bw | qwords
     if wiki and _wiki_used[0] < wiki_cap * total_shots:
         for w in wiki:
-            if not w["used"] and (w["words"] & bw):
+            if not w["used"] and (w["words"] & target):
                 w["used"] = True
                 _wiki_used[0] += 1
                 attributions.append(w["credit"])
                 credits.add("Wikimedia Commons")
-                return {"path": w["path"], "kind": "image", "reused": False, "source": "Wikimedia Commons"}
-    setting_q = " ".join((setting or "").split()[:3])
-    queries = [x for x in (q, alt) if x]
-    # pass 1: tag-matched video, then tag-matched photos
+                return {"path": w["path"], "kind": "image", "reused": False, "source": "Wikimedia Commons",
+                        "match_words": w["words"], "match_score": len(w["words"] & target)}
+    setting_q = " ".join((setting or "").split()[:5])
+    queries = list(dict.fromkeys(x for x in (q, alt, setting_q) if x))
+    # First prefer direct text/tag matches, then lower-confidence matches that still share a term.
     for query in queries:
-        a = _try(_stock(query, False), query, used, wd, 1) or _try(_stock(query, True), query, used, wd, 1)
+        a = _try(_stock(query, False), query, used, wd, 1)
         if a:
             return a
-    # pass 2: space/archive sources when relevant, then looser results of the main query
-    for query in queries:
-        extra = []
-        if any(w in query.lower() for w in SPACE_WORDS):
-            extra += _nasa(query)
-        a = _try(extra, query, used, wd, 0) if extra else None
+        a = _try(_stock(query, True), query, used, wd, 1)
         if a:
             return a
-    for query in queries + ([setting_q] if setting_q else []):
-        a = _try(_stock(query, True), query, used, wd, 0)
+    for query in (q, alt):
+        if query and any(w in query.lower() for w in SPACE_WORDS):
+            a = _try(_nasa(query), query, used, wd, 1)
+            if a:
+                return a
+    if q or alt:
+        a = _try(_archive(q or alt), q or alt, used, wd, 1)
         if a:
             return a
-    a = _try(_archive(q or alt or setting_q or "history"), q or "history", used, wd, 0) if (q or alt) else None
-    if a:
-        return a
-    for g in random.sample(FALLBACK, len(FALLBACK)):
-        a = _try(_stock(g, True), g, used, wd, 0)
-        if a:
-            return a
-    if _all:                                              # last resort: reuse
-        a = dict(random.choice(_all))
+    # Reuse only an asset whose indexed terms overlap this shot; otherwise show a contextual graphic.
+    reusable = [a for a in _all if a.get("match_words", set()) & target]
+    if reusable:
+        a = dict(max(reusable, key=lambda item: len(item.get("match_words", set()) & target)))
         a["reused"] = True
+        a["match_score"] = len(a.get("match_words", set()) & target)
         return a
-    raise RuntimeError("no footage found at all - check PIXABAY_API_KEY / PEXELS_API_KEY")
-
+    card = _context_card(q or alt, beat, setting, wd)
+    credits.add("Generated context cards")
+    return card
 
 def credit_line():
-    src = ", ".join(sorted(credits)) or "free-license sources"
-    line = f"{src} (free-license footage and images)."
+    src = ", ".join(sorted(credits)) or "no external footage"
+    line = f"Visual sources: {src}."
     if attributions:
         line += "\nPhotos: " + "; ".join(dict.fromkeys(attributions))[:1500] + " - via Wikimedia Commons."
     return line
