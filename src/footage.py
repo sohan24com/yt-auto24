@@ -61,6 +61,7 @@ def _get(url, headers=None, **kw):
 
 
 def _download(url, dest, headers=None):
+    dest = Path(dest)
     try:
         with requests.get(url, stream=True, timeout=60, headers=headers) as r:
             r.raise_for_status()
@@ -69,10 +70,13 @@ def _download(url, dest, headers=None):
                 for chunk in r.iter_content(1 << 20):
                     size += len(chunk)
                     if size > 90 << 20:
-                        return False
+                        raise ValueError("download exceeds 90 MB limit")
                     f.write(chunk)
+        if size == 0:
+            raise ValueError("download returned an empty file")
         return True
     except Exception:
+        dest.unlink(missing_ok=True)
         return False
 
 
