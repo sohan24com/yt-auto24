@@ -70,7 +70,7 @@ class QualityTests(unittest.TestCase):
             Image.new("RGB", (1280, 720), "navy").save(path, quality=90)
             self.assertEqual([], quality.validate_thumbnail(path, min_bytes=0))
             Image.new("RGB", (640, 360), "navy").save(path, quality=90)
-            self.assertIn("wrong thumbnail dimensions: 640x360", quality.validate_thumbnail(path))
+            self.assertIn("wrong thumbnail dimensions: 640x360", quality.validate_thumbnail(path, min_bytes=0))
 
     def test_asset_manifest_keeps_license_fields(self):
         rows = evidence.manifest_rows([{"asset_id": "a1", "source": "Pexels",
