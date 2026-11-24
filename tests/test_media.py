@@ -126,17 +126,17 @@ class PipelineTests(unittest.TestCase):
         self.assertNotEqual(groq_calls[0].kwargs["json"]["model"],
                             groq_calls[1].kwargs["json"]["model"])
 
-    def test_grounded_gemini_failure_does_not_call_groq(self):
+    def test_grounded_gemini_failure_uses_groq_browser_search(self):
         with (
             self._gemini_test_env(),
             patch.dict(os.environ, {"GROQ_API_KEY": "groq-key-1"}, clear=False),
             patch("src.common._model_list", return_value=["gemini-model"]),
             patch("src.common.requests.post", return_value=self._gemini_response(400)),
-            patch("src.common._groq") as groq,
+            patch("src.common._groq", return_value={"ok": True}) as groq,
         ):
-            with self.assertRaises(common.GeminiUnavailableError):
-                common.gemini("fact check", grounding=True, request_timeout=1, total_timeout=5)
-        groq.assert_not_called()
+            result = common.gemini("fact check", grounding=True, request_timeout=1, total_timeout=5)
+        self.assertEqual({"ok": True}, result)
+        self.assertTrue(groq.call_args.kwargs["grounding"])
 
     def test_gemini_rotates_to_next_key_on_quota(self):
         success = {"candidates": [{"content": {"parts": [{"text": '{"ok": true}'}]}}]}
