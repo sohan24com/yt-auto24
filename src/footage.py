@@ -279,11 +279,17 @@ def _try(cands, q, used, wd, min_score):
             license_name = source_meta.get("license", license_name)
             license_url = source_meta.get("license_url", license_url)
             license_status = source_meta.get("license_status", license_status)
+            if license_status == "review_required":
+                dest.unlink(missing_ok=True)
+                continue
+            credit = f"{match_text} ({source}; {license_name})"
+            if license_status == "allowed_attribution":
+                attributions.append(f"{credit} - {source_meta.get('asset_page', url)}")
             a = {"path": dest, "kind": kind, "reused": False, "source": source,
                  "asset_id": uid, "source_url": source_meta.get("asset_page", url),
                  "license": license_name, "license_url": license_url,
                  "license_status": license_status, "illustrative": source in ("Pexels", "Pixabay"),
-                 "credit": source}
+                 "credit": credit}
             a.update({"match_words": _words(q + " " + match_text),
                       "match_score": _score(q, match_text)})
             _all.append(a)
