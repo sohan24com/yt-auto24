@@ -92,7 +92,7 @@ class GeminiUnavailableError(RuntimeError):
     """Raised after bounded attempts across the configured Gemini keys and models."""
 
 
-def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
+def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
            tries=None, request_timeout=90, total_timeout=300):
     body = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
@@ -181,21 +181,9 @@ def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
     summary = ", ".join(f"HTTP {code} x{count}" for code, count in sorted(status_counts.items()))
     if not summary:
         summary = f"{attempts} request attempt(s)"
-    gemini_error = GeminiUnavailableError(
+    raise GeminiUnavailableError(
         f"Gemini unavailable after {attempts} bounded attempt(s) ({summary}); last response: {last}"
     )
-    if grounding:
-        raise gemini_error
-
-    # Groq is a text-generation fallback only. Google Search grounding is Gemini-only.
-    try:
-        return _groq(prompt, system=system, json_out=json_out, temperature=temperature)
-    except GroqUnavailableError as groq_error:
-        if str(groq_error) == "No Groq API keys are configured":
-            raise gemini_error
-        raise GeminiUnavailableError(
-            f"{gemini_error}; Groq fallback also failed: {groq_error}"
-        ) from groq_error
 
 
 GROQ_MODELS = (
@@ -282,6 +270,28 @@ def _groq(prompt, system=None, json_out=True, temperature=0.9,
     raise GroqUnavailableError(
         f"Groq unavailable after {attempts} bounded attempt(s) ({summary}); last response: {last}"
     )
+
+
+def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
+           tries=None, request_timeout=90, total_timeout=300):
+    """Use Gemini first, then Groq for ungrounded text/JSON if Gemini is unavailable."""
+    try:
+        return _gemini(
+            prompt, system=system, grounding=grounding, json_out=json_out,
+            temperature=temperature, tries=tries,
+            request_timeout=request_timeout, total_timeout=total_timeout,
+        )
+    except GeminiUnavailableError as gemini_error:
+        if grounding:
+            raise
+        try:
+            return _groq(prompt, system=system, json_out=json_out, temperature=temperature)
+        except GroqUnavailableError as groq_error:
+            if str(groq_error) == "No Groq API keys are configured":
+                raise gemini_error
+            raise GeminiUnavailableError(
+                f"{gemini_error}; Groq fallback also failed: {groq_error}"
+            ) from groq_error
 
 
 # ---------- notifications ----------
