@@ -82,7 +82,9 @@ class PipelineTests(unittest.TestCase):
                 "GROQ_API_KEY_2": "groq-key-2",
         }, clear=False), \\
              patch("src.common._model_list", return_value=["gemini-model"]), \\
-             patch("src.common.requests.post", side_effect=[gemini_quota, groq_success]) as post:
+             patch("src.common.requests.post", side_effect=[
+                 gemini_quota, gemini_quota, groq_success,
+             ]) as post:
             result = common.gemini("test prompt", request_timeout=1, total_timeout=5)
         self.assertEqual({"ok": True}, result)
         self.assertEqual("https://api.groq.com/openai/v1/chat/completions",
