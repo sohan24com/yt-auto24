@@ -97,10 +97,125 @@ def build_once(wd):
     return topic, script, scenes, durs, starts, final, total, problems
 
 
+
+def _job_dir():
+    path = Path(__file__).resolve().parent.parent / "memory" / "jobs"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _write_job_state(payload):
+    path = _job_dir() / f"{payload['job_id']}.json"
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tmp.replace(path)
+
+
+def _pending_job():
+    for path in sorted(_job_dir().glob("*.json")):
+        try:
+            job = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if job.get("state") in ("upload_pending", "long_uploaded", "short_pending", "short_failed"):
+            return job
+    return None
+
+
+def _short_tag(job_id):
+    return f"yt-auto24-id-{job_id}-short1"
+
+
+def _publish_short(record, final_path, wd, tags, title, seconds):
+    scenes = record.get("scenes", [])
+    starts = [float(scene["start"]) for scene in scenes]
+    durs = [float(scene.get("duration", 0)) for scene in scenes]
+    if not scenes or not all(scene.get("narration") for scene in scenes):
+        raise RuntimeError("saved scene narration is missing; cannot safely resume the Short")
+    out = Path(wd) / "short.mp4"
+    start, duration, scene_index = SH.choose_moment(scenes, starts, durs, seconds)
+    SH.make_short(final_path, start, duration, out)
+    problems = media_problems(out, expected_duration=duration, portrait=True,
+                              expected_fps=30, deep=True)
+    if problems:
+        raise RuntimeError("Short quality check failed: " + "; ".join(problems))
+    video_url = record["url"]
+    description = (f"Watch the full documentary: {video_url}\\n"
+                   "The story continues in the full video.\\n\\n#Shorts #documentary")
+    tag = _short_tag(record["job_id"])
+    existing = Y.find_upload_by_tag(tag)
+    if existing:
+        short_id = existing
+    else:
+        short_id = Y.upload(out, f"{title[:80]} #Shorts", description,
+                            list(tags or ["documentary"]) + ["shorts"],
+                            idempotency_tag=tag)
+    record["short_scene"] = scenes[scene_index].get("title", "")
+    record["short_id"] = short_id
+    try:
+        Y.add_comment(short_id, f"Full documentary: {video_url}")
+    except Exception as e:
+        print("Short comment not posted (non-fatal):", type(e).__name__)
+    save_video(record)
+    return short_id
+
+
+def _resume_pending_job(job):
+    """Resume the publish/Short stages from Drive artifacts without rendering/uploading a duplicate."""
+    wd = Path(tempfile.mkdtemp(prefix="doc_resume_"))
+    try:
+        record = job["record"]
+        metadata = job["metadata"]
+        video_tag = f"yt-auto24-id-{job['job_id']}-long"
+        if not record.get("video_id"):
+            existing = Y.find_upload_by_tag(video_tag)
+            if existing:
+                video_id = existing
+            else:
+                final_path = wd / "final.mp4"
+                D.download(job["drive_video_id"], final_path)
+                thumb_path = wd / "thumb.jpg"
+                if job.get("thumb_ids"):
+                    D.download(job["thumb_ids"][0], thumb_path)
+                video_id = Y.upload(final_path, metadata["title"], metadata["description"],
+                                    metadata["tags"], thumb=thumb_path if thumb_path.exists() else None,
+                                    idempotency_tag=video_tag)
+            record["video_id"] = video_id
+            record["url"] = f"https://youtu.be/{video_id}"
+            record["created"] = job.get("created", now().isoformat())
+            save_video(record)
+            job["state"] = "long_uploaded"
+            job["record"] = record
+            _write_job_state(job)
+
+        if job.get("shorts_enabled") and not record.get("short_id"):
+            job["state"] = "short_pending"
+            _write_job_state(job)
+            final_path = wd / "final.mp4"
+            D.download(job["drive_video_id"], final_path)
+            _publish_short(record, final_path, wd, metadata.get("tags", []),
+                           metadata["title"], float(job.get("short_seconds", 50)))
+        job["state"] = "complete"
+        job["record"] = record
+        job["completed"] = now().isoformat()
+        _write_job_state(job)
+        notify(f"Resumed production job {job['job_id']}: {record.get('url', '')}")
+    except Exception as e:
+        job["last_error"] = type(e).__name__
+        _write_job_state(job)
+        raise
+    finally:
+        shutil.rmtree(wd, ignore_errors=True)
+
 def main():
     print("code version:", (Path(__file__).resolve().parent.parent / "VERSION.txt").read_text().strip())
     c = cfg()
     force = os.environ.get("FORCE") == "1"
+    pending = _pending_job()
+    if pending:
+        print("Resuming saved production job:", pending["job_id"])
+        _resume_pending_job(pending)
+        return
     today = now().date()
     day = (today - dt.date.fromisoformat(str(c["start_date"]))).days + 1
     if day > c["days"] and not force:
@@ -150,8 +265,7 @@ def main():
         manifest_drive_id = D.upload(manifest_path, f"{today}_asset_manifest.json")
         thumb_ids = [D.upload(t, f"{today}_{t.name}") for t in thumbs]
 
-        vid = Y.upload(final, meta["title"], meta["description"], meta["tags"], thumb=thumbs[0])
-        rec = {"video_id": vid, "url": f"https://youtu.be/{vid}", "created": now().isoformat(),
+        rec = {"video_id": None, "url": "", "created": now().isoformat(),
                "job_id": job_id, "day": day, "topic": topic["topic"], "angle": topic["angle"], "category": topic["category"],
                "title": meta["title"], "title_b": meta["title_b"], "thumb_ids": thumb_ids,
                "drive_video_id": drive_video, "asset_manifest_drive_id": manifest_drive_id,
@@ -162,6 +276,24 @@ def main():
                            "narration": scene.get("narration", ""), "emotion": scene.get("emotion", "")}
                           for st, dur, scene in zip(starts, durs, scenes)],
                "fact_check_changes": script.get("changes", []), "swapped": False, "snapshots": {}}
+        job = {"job_id": job_id, "state": "upload_pending", "created": rec["created"],
+               "record": rec, "metadata": meta, "drive_video_id": drive_video,
+               "thumb_ids": thumb_ids, "manifest_drive_id": manifest_drive_id,
+               "shorts_enabled": bool(c["shorts"]["enabled"]),
+               "short_seconds": c["shorts"]["seconds"]}
+        _write_job_state(job)
+        video_tag = f"yt-auto24-id-{job_id}-long"
+        existing_video = Y.find_upload_by_tag(video_tag)
+        if existing_video:
+            vid = existing_video
+        else:
+            vid = Y.upload(final, meta["title"], meta["description"], meta["tags"],
+                           thumb=thumbs[0], idempotency_tag=video_tag)
+        rec["video_id"] = vid
+        rec["url"] = f"https://youtu.be/{vid}"
+        job["state"] = "long_uploaded"
+        job["record"] = rec
+        _write_job_state(job)
         save_video(rec)
 
         if c.get("localization", {}).get("enabled"):          # titles/descriptions in the viewer's language
@@ -178,27 +310,24 @@ def main():
 
         if c["shorts"]["enabled"]:
             try:
-                sp = Path(wd) / "short.mp4"
-                short_start, short_duration, short_scene = SH.choose_moment(
-                    scenes, starts, durs, c["shorts"]["seconds"])
-                SH.make_short(final, short_start, short_duration, sp)
-                short_bad = media_problems(sp, expected_duration=short_duration, portrait=True,
-                                           expected_fps=30, deep=True)
-                if short_bad:
-                    raise RuntimeError("Short quality check failed: " + "; ".join(short_bad))
-                full_url = f"https://youtu.be/{vid}"
-                short_desc = (f"Watch the full documentary: {full_url}\n"
-                              "The story continues in the full video.\n\n#Shorts #documentary")
-                rec["short_scene"] = scenes[short_scene].get("title", "")
-                rec["short_id"] = Y.upload(sp, f"{meta['title'][:80]} #Shorts",
-                                           short_desc, meta["tags"] + ["shorts"])
-                try:
-                    Y.add_comment(rec["short_id"], f"Full documentary: {full_url}")
-                except Exception as e:
-                    print("Short comment not posted (non-fatal):", e)
-                save_video(rec)
+                job["state"] = "short_pending"
+                _write_job_state(job)
+                _publish_short(rec, final, wd, meta["tags"], meta["title"], c["shorts"]["seconds"])
+                job["record"] = rec
+                job["state"] = "complete"
+                job["completed"] = now().isoformat()
+                _write_job_state(job)
             except Exception as e:
-                print("short failed (non-fatal):", e)
+                job["record"] = rec
+                job["state"] = "short_failed"
+                job["last_error"] = type(e).__name__
+                _write_job_state(job)
+                print("short failed; saved for the next run:", type(e).__name__)
+        else:
+            job["state"] = "complete"
+            job["record"] = rec
+            job["completed"] = now().isoformat()
+            _write_job_state(job)
         notify(f"Published day {day}: {meta['title']}\nhttps://youtu.be/{vid}")
     except Exception as e:
         notify(f"PIPELINE FAILED: {e}\n{traceback.format_exc()[-1200:]}")
