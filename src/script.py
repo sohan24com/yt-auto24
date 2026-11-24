@@ -146,9 +146,9 @@ def make_metadata(topic, scenes_with_times, sources, credits, fact_check=None, s
     outline = "; ".join(s["title"] for _, s in scenes_with_times)
     story_context = ""
     if story_blueprint:
-        story_context = (f"Supported title promise: {story_blueprint.get('title_promise', '')}\\n"
-                         f"Central question: {story_blueprint.get('central_question', '')}\\n"
-                         f"Opening hook: {story_blueprint.get('scenes', [{}])[0].get('narration', '')}\\n")
+        story_context = (f"Supported title promise: {story_blueprint.get('title_promise', '')}\n"
+                         f"Central question: {story_blueprint.get('central_question', '')}\n"
+                         f"Opening hook: {story_blueprint.get('scenes', [{}])[0].get('narration', '')}\n")
     prompt = f"""Create honest YouTube packaging for this researched documentary.
 Topic: {topic['topic']} | Angle: {topic['angle']} | Chapters: {outline}
 {story_context}
