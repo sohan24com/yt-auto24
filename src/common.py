@@ -71,7 +71,7 @@ def _model_list(key):
                 found.append((-float(mm.group(1)), bool(mm.group(2)), bool(mm.group(3)), name))
         found.sort()
     except Exception as e:
-        print("model discovery failed:", e)
+        print("model discovery failed:", type(e).__name__)
     order = [c["gemini_model"]] + [f[3] for f in found] + list(c.get("gemini_fallbacks", [])) + ["gemini-flash-latest"]
     _MODELS = list(dict.fromkeys(order))
     print("Gemini models to try:", _MODELS[:6])
@@ -138,7 +138,7 @@ def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
 
                 status = int(r.status_code)
                 status_counts[status] = status_counts.get(status, 0) + 1
-                last = f"{model}: HTTP {status} {r.text[:160]}"
+                last = f"{model}: HTTP {status}"
                 print(f"Gemini candidate unavailable: {model} HTTP {status}")
 
                 if status == 503 or status in (500, 502, 504):
@@ -158,7 +158,7 @@ def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
                 last = f"{model}: request timed out"
                 continue
             except Exception as ex:
-                last = f"{model}: {type(ex).__name__}: {str(ex)[:120]}"
+                last = f"{model}: {type(ex).__name__}"
                 continue
 
         if tries is not None and attempts >= tries:
