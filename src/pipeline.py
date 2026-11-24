@@ -33,8 +33,13 @@ def gate(final, total, reuse, asset_manifest=None):
     bad.extend(quality.validate_ass(Path(final).parent / "subs.ass", total))
     allowed = {"provider_terms", "allowed_public_domain", "allowed_attribution", "original_generated"}
     for row in asset_manifest or []:
+        label = row.get("asset_id") or row.get("source") or "unknown asset"
         if row.get("license_status") not in allowed:
-            bad.append(f"asset license needs review: {row.get('asset_id') or row.get('source') or 'unknown asset'}")
+            bad.append(f"asset license needs review: {label}")
+        if not row.get("source_url") or not row.get("license"):
+            bad.append(f"asset provenance is incomplete: {label}")
+        if row.get("license_status") != "original_generated" and not row.get("license_url"):
+            bad.append(f"asset license URL is missing: {label}")
     return bad
 
 def build_once(wd):
