@@ -90,8 +90,8 @@ def _gemini(text, out, emotion, keys):
     v = cfg()["video"]
     direction = emotion or "calm and cinematic"
     prompt = f"Say in a {direction} documentary narrator voice, with natural pauses and expressive emphasis:\n\n{_clean(text)}"
-    for attempt in range(3):
-        key = keys[attempt % len(keys)]
+    for attempt in range(len(keys)):
+        key = keys[attempt]
         try:   # 1) Interactions API (current docs)
             r = requests.post("https://generativelanguage.googleapis.com/v1beta/interactions",
                               headers={"x-goog-api-key": key, "Content-Type": "application/json"},
