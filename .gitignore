@@ -1,4 +1,5 @@
 __pycache__/
 client_secret*.json
 *.pyc
-\ntools/.youtube_refresh_token\ntools/.drive_refresh_token\n
+tools/.youtube_refresh_token
+tools/.drive_refresh_token
