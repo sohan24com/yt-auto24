@@ -231,6 +231,11 @@ def main():
     if made_today >= c["videos_per_day"] and not force:
         print("daily quota already met")
         return
+    # If an upload exists but its saved job manifest is missing, stop instead of
+    # attaching that existing video ID to newly generated content.
+    orphan_tag = f"yt-auto24-id-{job_id}-long"
+    if Y.find_upload_by_tag(orphan_tag):
+        raise RuntimeError("matching YouTube upload exists but its saved job state is missing; refusing a duplicate or mismatched record")
 
     wd = tempfile.mkdtemp(prefix="doc_")
     try:
