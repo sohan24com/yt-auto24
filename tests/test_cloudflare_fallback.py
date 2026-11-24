@@ -46,6 +46,30 @@ class CloudflareFallbackTests(unittest.TestCase):
         groq.assert_not_called()
         cf.assert_not_called()
 
+    def test_openrouter_uses_free_router_and_parses_json(self):
+        response = unittest.mock.Mock()
+        response.status_code = 200
+        response.json.return_value = {
+            "choices": [{"message": {"content": '{"ok": true}'}}]
+        }
+        with patch.object(common, "env", return_value="test-openrouter-key"), \
+             patch.object(common.requests, "post", return_value=response) as post:
+            result = common._openrouter("Return JSON", json_out=True)
+        self.assertEqual(result, {"ok": True})
+        args, kwargs = post.call_args
+        self.assertEqual(args[0], "https://openrouter.ai/api/v1/chat/completions")
+        self.assertEqual(kwargs["json"]["model"], "openrouter/free")
+        self.assertEqual(kwargs["headers"]["Authorization"], "Bearer test-openrouter-key")
+
+    def test_openrouter_follows_unavailable_providers(self):
+        with patch.object(common, "_gemini", side_effect=common.GeminiUnavailableError("gemini quota")), \
+             patch.object(common, "_groq", side_effect=common.GroqUnavailableError("groq quota")), \
+             patch.object(common, "_cloudflare", side_effect=common.CloudflareUnavailableError("cloudflare quota")), \
+             patch.object(common, "_openrouter", return_value={"script": "ok"}) as router:
+            result = common.gemini("prompt")
+        self.assertEqual(result, {"script": "ok"})
+        router.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -327,9 +327,60 @@ def _cloudflare(prompt, system=None, json_out=True, temperature=0.9,
             f"Cloudflare request failed: {type(exc).__name__}"
         ) from exc
 
+
+class OpenRouterUnavailableError(RuntimeError):
+    """Raised when the optional free OpenRouter fallback cannot answer."""
+
+
+def _openrouter(prompt, system=None, json_out=True, temperature=0.9,
+                request_timeout=30):
+    """Use OpenRouter's free-model router only; do not send calls to paid models."""
+    key = env("OPENROUTER_API_KEY", False).strip()
+    if not key:
+        raise OpenRouterUnavailableError("OpenRouter credentials are not configured")
+
+    messages = []
+    if system:
+        instruction = system
+        if json_out:
+            instruction += "\\nReturn valid JSON only, with no Markdown fences or extra text."
+        messages.append({"role": "system", "content": instruction})
+    user_prompt = prompt
+    if json_out and not system:
+        user_prompt += "\\nReturn valid JSON only, with no Markdown fences or extra text."
+    messages.append({"role": "user", "content": user_prompt})
+
+    try:
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={"Authorization": f"Bearer {key}",
+                     "Content-Type": "application/json"},
+            json={"model": "openrouter/free", "messages": messages,
+                  "temperature": temperature, "max_tokens": 4096},
+            timeout=float(request_timeout),
+        )
+        if response.status_code != 200:
+            print(f"OpenRouter candidate unavailable: HTTP {response.status_code}")
+            raise OpenRouterUnavailableError(
+                f"OpenRouter free router returned HTTP {response.status_code}"
+            )
+        content = (response.json().get("choices", [{}])[0]
+                   .get("message", {}).get("content") or "")
+        if not content.strip():
+            raise OpenRouterUnavailableError("OpenRouter returned an empty response")
+        return extract_json(content) if json_out else content
+    except OpenRouterUnavailableError:
+        raise
+    except requests.Timeout as exc:
+        raise OpenRouterUnavailableError("OpenRouter request timed out") from exc
+    except Exception as exc:
+        raise OpenRouterUnavailableError(
+            f"OpenRouter request failed: {type(exc).__name__}"
+        ) from exc
+
 def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
            tries=None, request_timeout=90, total_timeout=300):
-    """Use Gemini first; Groq then Cloudflare are optional ungrounded text fallbacks."""
+    """Use Gemini, then Groq, Cloudflare and OpenRouter free models for ungrounded text."""
     try:
         return _gemini(
             prompt, system=system, grounding=grounding, json_out=json_out,
@@ -340,24 +391,23 @@ def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
         # Do not replace a Google Search grounded fact-check with an ungrounded answer.
         if grounding:
             raise
-        groq_error = None
-        try:
-            return _groq(prompt, system=system, json_out=json_out, temperature=temperature)
-        except GroqUnavailableError as exc:
-            groq_error = exc
-        try:
-            print("Groq unavailable; trying Cloudflare Workers AI")
-            return _cloudflare(
-                prompt, system=system, json_out=json_out, temperature=temperature
-            )
-        except CloudflareUnavailableError as cloudflare_error:
-            if (str(groq_error) == "No Groq API keys are configured"
-                    and str(cloudflare_error) == "Cloudflare credentials are not configured"):
-                raise gemini_error
-            raise GeminiUnavailableError(
-                f"{gemini_error}; Groq fallback failed: {groq_error}; "
-                f"Cloudflare fallback failed: {cloudflare_error}"
-            ) from cloudflare_error
+        errors = []
+        providers = (
+            ("Groq", _groq, GroqUnavailableError),
+            ("Cloudflare Workers AI", _cloudflare, CloudflareUnavailableError),
+            ("OpenRouter free models", _openrouter, OpenRouterUnavailableError),
+        )
+        for label, call, error_type in providers:
+            try:
+                print(f"Trying {label} fallback")
+                return call(prompt, system=system, json_out=json_out, temperature=temperature)
+            except error_type as exc:
+                errors.append(f"{label}: {exc}")
+        if all("credentials are not configured" in error for error in errors):
+            raise gemini_error
+        raise GeminiUnavailableError(
+            f"{gemini_error}; " + "; ".join(errors)
+        )
 
 
 # ---------- notifications ----------

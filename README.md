@@ -14,12 +14,15 @@ uploads media that fails the media probes.
    The code tries configured keys across Gemini requests; Gemini TTS also moves to the next key after a failure.
    Add keys from separate Google Cloud projects if you need separate project quotas; multiple keys in one
    project generally share that project's quota.
-3. **Optional text fallbacks**: add `GROQ_API_KEY` and `GROQ_API_KEY_2` for Groq, plus
-   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` for Cloudflare Workers AI. The order is Gemini,
-   Groq, then Cloudflare for ordinary text/JSON generation. Google Search grounded fact-check remains
-   Gemini-only and keeps its existing safe behavior if Gemini is unavailable. Groq keys in one organization
-   share quota. Cloudflare Workers AI has a daily free allocation; requests can fail after it is exhausted.
-   Create the token from Workers AI → Use REST API and keep both values only in Actions secrets.
+3. **Optional text fallbacks**: add `GROQ_API_KEY` and `GROQ_API_KEY_2` for Groq,
+   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` for Cloudflare Workers AI, and
+   `OPENROUTER_API_KEY` for OpenRouter. Ordinary text/JSON generation tries Gemini, Groq, Cloudflare,
+   then OpenRouter's `openrouter/free` router only; it never selects a paid OpenRouter model. The free
+   router is rate limited (currently 50 requests/day); provider availability can still vary. Google Search
+   grounded fact-check remains Gemini-only and keeps its existing safe behavior if Gemini is unavailable.
+   Groq keys in one organization share quota. Cloudflare also has a daily free allocation.
+   Keep all credentials only in Actions secrets. Cohere trial keys are not used by this production workflow:
+   Cohere says trial keys are not permitted for production or commercial use; a production key is paid.
 4. **Pexels key**: https://www.pexels.com/api/ -> secret `PEXELS_API_KEY`.
 5. **Google Cloud** (console.cloud.google.com), one project:
    - Enable: YouTube Data API v3, YouTube Analytics API, Google Drive API.
