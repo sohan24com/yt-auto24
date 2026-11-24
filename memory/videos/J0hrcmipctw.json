@@ -1,0 +1,81 @@
+{
+ "video_id": "J0hrcmipctw",
+ "url": "https://youtu.be/J0hrcmipctw",
+ "created": "2026-11-24T18:45:20.306837+00:00",
+ "day": 2,
+ "topic": "The Antikythera Mechanism",
+ "angle": "How did ancient Greek engineers create a complex astronomical analog computer 1,000 years before European mechanical clockwork existed?",
+ "category": "mystery",
+ "title": "The 2,000-Year-Old Analog Computer",
+ "title_b": "Inside the World's Oldest Analog Computer",
+ "thumb_ids": [
+  "1ReUVkJgXo3qv_R5aC5DKoVgD8b3WBWSt",
+  "1imWlxQmvBn-4wDFXWoIeHLc2InBVq4GL",
+  "1pp-6Ga_HnKqAjoaZPdEGEGr9owaIdZkx"
+ ],
+ "drive_video_id": "1dNAjLMoAC2JE6fbX792O-1W_w-XTgq6k",
+ "duration": 569,
+ "short_id": "Rb0zV7wwQ_Q",
+ "scenes": [
+  {
+   "title": "The Wreckage",
+   "start": 0
+  },
+  {
+   "title": "The Calcified Fragment",
+   "start": 58
+  },
+  {
+   "title": "Peering Inside Metal",
+   "start": 111
+  },
+  {
+   "title": "The Gearbox of the Sun and Moon",
+   "start": 167
+  },
+  {
+   "title": "Predicting Eclipses",
+   "start": 219
+  },
+  {
+   "title": "Tracking the Planets",
+   "start": 269
+  },
+  {
+   "title": "The Mind of Archimedes",
+   "start": 309
+  },
+  {
+   "title": "The Vanishing Act",
+   "start": 356
+  },
+  {
+   "title": "The Hidden Continuum",
+   "start": 422
+  },
+  {
+   "title": "Rewriting Technological History",
+   "start": 469
+  },
+  {
+   "title": "Legacy of the Gears",
+   "start": 524
+  }
+ ],
+ "fact_check_changes": [],
+ "swapped": false,
+ "snapshots": {},
+ "localized": [
+  "ar",
+  "bn",
+  "de",
+  "es",
+  "fr",
+  "hi",
+  "id",
+  "ja",
+  "pt",
+  "ru"
+ ],
+ "short_scene": "The Vanishing Act"
+}
