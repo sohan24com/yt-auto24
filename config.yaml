@@ -14,7 +14,7 @@ gemini_fallbacks: ["gemini-3.7-flash", "gemini-3.5-flash"]   # used automaticall
 
 video:
   words_min: 1150
-  words_max: 1600
+  words_max: 1400
   min_seconds: 450      # quality gate: 7.5 min
   max_seconds: 660      # quality gate: 11 min
   voice: "en-GB-RyanNeural"
