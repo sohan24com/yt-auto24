@@ -51,22 +51,37 @@ Return JSON: {{"setting":"place + era keywords for stock searches, e.g. 'Scotlan
 
 
 def fact_check(script):
-    prompt = f"""You are a strict documentary fact-checker. Use the available live web-search tool to verify every factual claim
-(dates, names, numbers, causes) in this script. Fix errors. Remove or hedge anything you cannot verify.
-Keep the same structure, tone and length (within 10%). Keep every scene's "visuals" unchanged.
-Return ONLY JSON: {{"scenes":[...same format...],"sources":["urls or publication names actually used"],"changes":["what you changed"]}}
+    from .evidence import evidence_record, normalize_evidence
+
+    prompt = f"""You are a strict documentary fact-checker. Use the available live web-search tool.
+For every material factual claim, provide a claim-to-source record: scene number (1-based), exact claim,
+a concise supporting explanation grounded in the search result, source name, direct HTTPS source URL,
+and confidence (high/medium/low). Never invent a URL, publication, quote, or evidence.
+Correct errors; remove or qualify claims that search does not support. Keep the same scenes and story.
+Return ONLY JSON with:
+{{"scenes":[...],"claims":[{{"scene":1,"claim":"","evidence":"","source":"","source_url":"https://...","confidence":"medium"}}],"changes":["..."]}}
+Include only claims actually checked using search; do not say that this is independent human verification.
 
 SCRIPT:
 {script}"""
     try:
         out = gemini(prompt, grounding=True, temperature=0.2)
-        if (out.get("scenes") and len(out["scenes"]) >= 8
-                and isinstance(out.get("sources"), list) and out["sources"]):
-            return out
+        scenes = out.get("scenes")
+        claims, reason = normalize_evidence(out, len(script.get("scenes", [])))
+        if (isinstance(scenes, list) and len(scenes) >= 8 and claims
+                and abs(len(scenes) - len(script.get("scenes", []))) <= 1):
+            result = dict(out)
+            result["sources"] = list(dict.fromkeys(row["source_url"] for row in claims))
+            result["_fact_check"] = evidence_record(claims)
+            return result
+        reason = reason or "fact-check response has an incomplete scene structure"
+        print("fact_check returned incomplete evidence; keeping original script")
     except Exception as e:
-        print("fact_check failed, keeping original:", e)
-    return script
-
+        reason = type(e).__name__
+        print("fact_check failed; keeping original script:", reason)
+    fallback = dict(script)
+    fallback["_fact_check"] = evidence_record([], reason)
+    return fallback
 
 def valid(script):
     v = cfg()["video"]
@@ -102,7 +117,15 @@ def _fallback_terms(text, limit=4):
     return words[:limit]
 
 
-def make_metadata(topic, scenes_with_times, sources, credits):
+def _fact_check_note(record):
+    record = record if isinstance(record, dict) else {}
+    if record.get("status") == "search_linked":
+        return ("search-assisted; claim/source links are recorded in the production manifest, "
+                "but still need editorial review.")
+    return "not search-verified for this run; factual claims need editorial review."
+
+
+def make_metadata(topic, scenes_with_times, sources, credits, fact_check=None):
     chapters = "\n".join(f"{t} {s['title']}" for t, s in scenes_with_times)
     outline = "; ".join(s["title"] for _, s in scenes_with_times)
     prompt = f"""Create honest YouTube packaging for this researched documentary.
@@ -137,7 +160,7 @@ Return JSON: {{"titles":[{{"title":"","curiosity":0,"clarity":0,"honesty":0}}],"
         titles = [{"title": str(topic.get("topic") or "Documentary"), "honesty": 10}]
     src = "\n".join("- " + s for s in sources[:8])
     desc = (f"{m.get('description', topic.get('topic', 'Documentary'))}\n\nCHAPTERS\n{chapters}\n\nSOURCES\n{src}\n\n"
-            f"FOOTAGE: {credits}\nNarration is AI-generated; research assisted by AI and fact-checked against web sources.")
+            f"FOOTAGE: {credits}\nNarration is AI-generated; {_fact_check_note(fact_check)}")
     anchors = set(w.lower() for w in _fallback_terms(
         topic.get("topic", "") + " " + topic.get("angle", "") + " " + outline, 80))
     fallback_texts = [" ".join(_fallback_terms(topic.get("topic"), 3)),
