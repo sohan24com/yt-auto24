@@ -13,9 +13,9 @@ STOP = {
     "these", "they", "this", "those", "to", "was", "were", "what", "when", "where",
     "which", "who", "why", "will", "with", "we", "you", "your",
 }
-PLAN_FIELDS = ("story_purpose", "story_progress", "emotion", "opens_loop", "pays_off",
-               "pattern_interrupt", "information_reveal", "target_duration_seconds",
-               "visual_plan")
+PLAN_FIELDS = ("story_purpose", "story_progress", "causal_link", "visual_anchor",
+               "emotion", "opens_loop", "pays_off", "pattern_interrupt", "information_reveal",
+               "target_duration_seconds", "visual_plan")
 VISUAL_FIELDS = ("description", "camera_movement", "footage_keywords", "animation",
                  "sound_effect", "music_mood", "transition")
 
@@ -119,15 +119,24 @@ def validate_blueprint(blueprint, require_evidence=False):
         issues.append("story: exactly three acts are required")
     else:
         listed = []
-        for act in acts:
+        expected_act = {}
+        for act_index, act in enumerate(acts, 1):
             numbers = act.get("scene_numbers", []) if isinstance(act, dict) else []
             if (not isinstance(act, dict) or not act.get("name")
                     or not act.get("dramatic_question") or not numbers):
                 issues.append("story: every act needs a name, dramatic question, and scene list")
             listed.extend(numbers)
+            try:
+                for number in numbers:
+                    expected_act[int(number)] = act_index
+            except (TypeError, ValueError):
+                pass
         try:
             if sorted(int(number) for number in listed) != list(range(1, len(scenes) + 1)):
                 issues.append("story: acts must cover each scene exactly once")
+            if any(int(scene_map[n].get("act", 0)) != expected_act.get(n)
+                   for n in scene_numbers if n in expected_act):
+                issues.append("story: scene act labels do not match the act outline")
         except (TypeError, ValueError):
             issues.append("story: act scene references must be integers")
 
@@ -215,8 +224,16 @@ def validate_blueprint(blueprint, require_evidence=False):
         narration = str(scene.get("narration", "")).strip()
         if len(narration.split()) < 8:
             issues.append(f"story: scene {number} narration is too short to advance the story")
-        if not scene.get("story_purpose") or not scene.get("story_progress"):
-            issues.append(f"story: scene {number} needs purpose and meaningful progression")
+        if not scene.get("story_purpose") or not scene.get("story_progress") or not scene.get("causal_link"):
+            issues.append(f"story: scene {number} needs purpose, progression, and a cause/effect link")
+        anchor = _tokens(scene.get("visual_anchor", ""))
+        visual_text = " ".join(str(value) for value in (
+            (scene.get("visual_plan") or {}).get("description", ""),
+            " ".join((scene.get("visual_plan") or {}).get("footage_keywords", []))
+            if isinstance((scene.get("visual_plan") or {}).get("footage_keywords", []), list) else "",
+        ))
+        if not anchor or not anchor <= (_tokens(narration) & _tokens(visual_text)):
+            issues.append(f"storyboard: scene {number} visual anchor must occur in narration and planned visuals")
         missing = [field for field in PLAN_FIELDS if field not in scene]
         if missing:
             issues.append(f"storyboard: scene {number} missing " + ", ".join(missing))
