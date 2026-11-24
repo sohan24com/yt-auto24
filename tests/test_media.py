@@ -51,7 +51,7 @@ class PipelineTests(unittest.TestCase):
         }, clear=False)
 
     def test_gemini_rotates_to_next_key_on_quota(self):
-        success = {"candidates": [{"content": {"parts": [{"text": "{\\"ok\\": true}"}]}}]}
+        success = {"candidates": [{"content": {"parts": [{"text": '{"ok": true}'}]}}]}
         with self._gemini_test_env(), \\
              patch("src.common._model_list", return_value=["model-a"]), \\
              patch("src.common.requests.post", side_effect=[
@@ -64,7 +64,7 @@ class PipelineTests(unittest.TestCase):
                          [call.kwargs["params"]["key"] for call in post.call_args_list])
 
     def test_gemini_moves_to_next_model_on_capacity_error(self):
-        success = {"candidates": [{"content": {"parts": [{"text": "{\\"ok\\": true}"}]}}]}
+        success = {"candidates": [{"content": {"parts": [{"text": '{"ok": true}'}]}}]}
         with self._gemini_test_env(), \\
              patch("src.common._model_list", return_value=["model-a", "model-b"]), \\
              patch("src.common.requests.post", side_effect=[
