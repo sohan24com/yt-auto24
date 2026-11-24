@@ -431,7 +431,7 @@
       "pattern_interrupt": "",
       "story_purpose": "Explain the basis of the 2021 proposal without implying consensus beyond the article.",
       "visual_plan": {
-        "description": "Three evidence columns converge on a clearly marked hypothetical gear layout.",
+        "description": "Three evidence columns constrain the proposed model's hypothetical gear layout.",
         "camera_movement": "Slide from evidence to model.",
         "footage_keywords": [
           "gear tooth closeup",
@@ -445,7 +445,7 @@
       },
       "target_duration_seconds": 34,
       "causal_link": "The model is constrained by multiple kinds of evidence rather than one attractive animation.",
-      "visual_anchor": "evidence",
+      "visual_anchor": "model",
       "information_reveal": "The reconstruction is constrained by evidence, though some parts remain hypothetical."
     },
     {
@@ -510,7 +510,7 @@
       },
       "target_duration_seconds": 30,
       "causal_link": "That boundary becomes essential when the authors identify the missing direct evidence.",
-      "visual_anchor": "fragment",
+      "visual_anchor": "missing",
       "information_reveal": "The planets display is a proposal constrained by clues, not a fully recovered original assembly."
     },
     {
@@ -595,7 +595,7 @@
       "pattern_interrupt": "The music opens as observed gear teeth turn in sequence.",
       "story_purpose": "Deliver the emotional meaning grounded in evidence.",
       "visual_plan": {
-        "description": "Artifact details and simple cycle animation, clearly separated from the speculative full model.",
+        "description": "Artifact details and simple cycle animation show the documented ancient gears, clearly separated from the speculative full model.",
         "camera_movement": "Slow orbit over documented fragment photography.",
         "footage_keywords": [
           "bronze gear mechanism",
@@ -609,7 +609,7 @@
       },
       "target_duration_seconds": 34,
       "causal_link": "This careful limit makes the demonstrated gear-and-cycle achievement more meaningful.",
-      "visual_anchor": "gears",
+      "visual_anchor": "ancient",
       "information_reveal": "The wonder is not that the machine did everything; it is what the evidence shows it could do."
     },
     {
