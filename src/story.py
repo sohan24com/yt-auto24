@@ -31,9 +31,16 @@ def _similarity(left, right):
 
 
 def _scene_map(blueprint):
-    return {int(scene.get("number", index)): scene
-            for index, scene in enumerate(blueprint.get("scenes", []), 1)
-            if isinstance(scene, dict)}
+    result = {}
+    for index, scene in enumerate(blueprint.get("scenes", []), 1):
+        if not isinstance(scene, dict):
+            continue
+        try:
+            number = int(scene.get("number", index))
+        except (TypeError, ValueError):
+            continue
+        result[number] = scene
+    return result
 
 
 def evidence_dossier(record):
@@ -114,7 +121,8 @@ def validate_blueprint(blueprint, require_evidence=False):
         listed = []
         for act in acts:
             numbers = act.get("scene_numbers", []) if isinstance(act, dict) else []
-            if not act.get("name") or not act.get("dramatic_question") or not numbers:
+            if (not isinstance(act, dict) or not act.get("name")
+                    or not act.get("dramatic_question") or not numbers):
                 issues.append("story: every act needs a name, dramatic question, and scene list")
             listed.extend(numbers)
         try:
