@@ -7,6 +7,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 
 SC = {
     "youtube": ["https://www.googleapis.com/auth/youtube",
+                "https://www.googleapis.com/auth/youtube.force-ssl",
                 "https://www.googleapis.com/auth/yt-analytics.readonly"],
     "drive": ["https://www.googleapis.com/auth/drive.file"],
 }
