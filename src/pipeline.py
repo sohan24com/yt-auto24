@@ -5,7 +5,7 @@ from pathlib import Path
 from . import topic as T, script as S, voice as V, footage as F, edit as E
 from . import thumbnail as TH, shorts as SH, drive as D, youtube as Y
 from .common import cfg, now, load_videos, save_video, notify
-from . import quality
+from . import quality, story as STORY
 from .evidence import manifest_rows
 
 
@@ -57,24 +57,37 @@ def build_once(wd):
     else:
         raise RuntimeError(f"could not produce a valid script: {problems}")
     checked = S.fact_check(script)
+    checked = STORY.preserve_planning(script, checked)
     for k in ("setting", "wiki_terms", "hook_text"):            # fact-check output may drop these
         checked[k] = script.get(k, checked.get(k))
-    for i, sc in enumerate(checked["scenes"]):                  # ...and per-scene emotion / visuals
-        if i < len(script["scenes"]):
-            sc.setdefault("emotion", script["scenes"][i].get("emotion"))
-            sc.setdefault("visuals", script["scenes"][i].get("visuals", []))
-    script = checked
-    fact_status = script.get("_fact_check", {}).get("status")
+    checked = STORY.attach_evidence(checked, checked.get("_fact_check", {}))
+    fact_status = checked.get("_fact_check", {}).get("status")
     if cfg().get("publishing", {}).get("require_search_linked_fact_check", True) and fact_status != "search_linked":
         raise RuntimeError("publish held: this run has no valid search-linked claim evidence")
+    story_issues = STORY.validate_blueprint(checked, require_evidence=True)
+    if story_issues:
+        raise RuntimeError("publish held by story quality checks: " + "; ".join(story_issues[:12]))
+    checked["story_quality"] = STORY.quality_score(checked, require_evidence=True)
+    script = checked
     scenes = script["scenes"]
 
     voice_wav, durs, engine = V.build_voice(scenes, wd)
     total = sum(durs)
     print(f"voice {total:.0f}s ({engine})")
     limits = cfg()["video"]
+    timing = cfg().get("story", {})
+    timing_issues = STORY.validate_timing(
+        script, durs,
+        min_scene=float(timing.get("min_progression_seconds", 20)),
+        max_scene=float(timing.get("max_progression_seconds", 45)),
+        max_hook=float(timing.get("hook_max_seconds", 5)),
+        max_total=float(limits["max_seconds"]),
+    )
+    if timing_issues:
+        print("QUALITY GATE failed before footage:", timing_issues)
+        return topic, script, scenes, durs, [], Path(wd) / "final.mp4", total, timing_issues
     if not (limits["min_seconds"] <= total <= limits["max_seconds"]):
-        problem = f"voice duration {total:.0f}s outside {limits['min_seconds']}-{limits['max_seconds']}"
+        problem = f"voice duration {total:.0f}s outside {limits['min_seconds']}-{limits['max_seconds']}s"
         print("QUALITY GATE failed before footage:", problem)
         return topic, script, scenes, durs, [], Path(wd) / "final.mp4", total, [problem]
 
@@ -256,7 +269,10 @@ def main():
 
         meta = S.make_metadata(topic, [(stamp(st), s) for st, s in zip(starts, scenes)],
                                script.get("sources", []), F.credit_line(),
-                               fact_check=script.get("_fact_check"))
+                               fact_check=script.get("_fact_check"), story_blueprint=script)
+        packaging_issues = STORY.validate_packaging(script, meta)
+        if packaging_issues:
+            raise RuntimeError("publish held by story packaging checks: " + "; ".join(packaging_issues))
         shots = sorted(Path(wd).glob("shot*.mp4"))          # clean shots have no burned subtitles
         frame_paths = []
         for n, idx in enumerate(sorted({0, len(shots) // 2, len(shots) - 1})):
@@ -271,14 +287,31 @@ def main():
 
         manifest_path = Path(wd) / "asset_manifest.json"
         manifest_path.write_text(json.dumps(script.get("_asset_manifest", []), indent=2), encoding="utf-8")
+        story_path = Path(wd) / "story_blueprint.json"
+        story_artifact = {
+            "schema_version": script.get("story_schema_version", 1),
+            "title": meta["title"], "title_promise": script.get("title_promise", ""),
+            "central_question": script.get("central_question", ""),
+            "acts": script.get("acts", []), "open_loops": script.get("open_loops", []),
+            "research_dossier": script.get("research_dossier", []),
+            "fact_check": script.get("_fact_check", {}),
+            "quality": script.get("story_quality", {}),
+            "scenes": script.get("scenes", []),
+        }
+        story_path.write_text(json.dumps(story_artifact, indent=2), encoding="utf-8")
         drive_video = D.upload(final, f"{today}_{meta['title'][:40]}.mp4")
         manifest_drive_id = D.upload(manifest_path, f"{today}_asset_manifest.json")
+        story_drive_id = D.upload(story_path, f"{today}_story_blueprint.json")
         thumb_ids = [D.upload(t, f"{today}_{t.name}") for t in thumbs]
 
         rec = {"video_id": None, "url": "", "created": now().isoformat(),
                "job_id": job_id, "day": day, "topic": topic["topic"], "angle": topic["angle"], "category": topic["category"],
                "title": meta["title"], "title_b": meta["title_b"], "thumb_ids": thumb_ids,
                "drive_video_id": drive_video, "asset_manifest_drive_id": manifest_drive_id,
+               "story_blueprint_drive_id": story_drive_id,
+               "story_quality": script.get("story_quality", {}),
+               "central_question": script.get("central_question", ""),
+               "title_promise": script.get("title_promise", ""),
                "asset_manifest": script.get("_asset_manifest", []),
                "fact_check": script.get("_fact_check", {}),
                "duration": round(total), "short_id": None,
