@@ -10,45 +10,53 @@ def write_script(topic, validation_feedback=None):
     v = c["video"]
     lessons = "\n".join("- " + l for l in load_insights().get("lessons", []))
     feedback = "\n".join("- " + str(p) for p in (validation_feedback or [])) or "- none"
-    prompt = f"""Write the narration for a documentary video of 8-10 minutes.
+    prompt = f"""Write a rigorous 8-10 minute English documentary narration using one evidence-led story blueprint.
 Channel tone: {c['channel']['tone']}.
 Topic: {topic['topic']}
 Angle: {topic['angle']}
 
-STRUCTURE
-- Scene 1 starts immediately with a truthful, source-checkable hook that can be spoken in 5 seconds (max 12 words).
-  The FIRST sentence must use a concrete, story-specific fact or question; no invented numbers, greetings, welcome,
-  channel introduction, or throat-clearing. Leave a real unresolved question for the story to answer.
-  Give "hook_text": 3-5 short ALL-CAPS words that accurately summarize this hook.
-- Follow with 10-12 scenes that build a clear cause-and-effect story; use an open loop only when the next scene answers it.
-- Final scene delivers the researched payoff, then a natural outro thanking viewers, inviting Like/Comment/Subscribe,
-  and pointing to the next related documentary without inventing a specific video title or link.
-DELIVERY
-- For every scene give "emotion": a short voice-acting direction that matches what happens in it, e.g.
-  "hushed, suspenseful", "somber, slow", "awed, rising", "urgent, tense", "calm, matter-of-fact", "warm, reflective".
-  Vary it across the video; mysterious moments are hushed, tragedies are somber, discoveries are awed.
-STYLE
-- Concrete details (dates, places, numbers), short sentences mixed with long ones, plain words.
-- Banned cliches: "in a world", "little did they know", "buckle up", "let's dive in".
-- Total narration {v['words_min']}-{v['words_max']} words. Spoken text only (no stage directions, no markdown).
+STORY CONTRACT
+- Create exactly 18 numbered scenes in exactly three acts: Act I scenes 1-5; Act II scenes 6-14; Act III scenes 15-18.
+- Scene 1 is a standalone cold-open hook: one truthful sentence, at most 12 words, no greeting, no channel intro.
+  It must open a specific question answered later. It is the entire hook scene, not a paragraph that runs past five seconds.
+- The central_question, title_promise and opening narration must describe the same documented story.
+- Act I establishes the object, stakes and investigation; Act II develops evidence and complications; Act III delivers the evidence-bounded answer, meaning and concise natural CTA.
+- Create 1-3 open loops, each with a unique ID, opening scene, question and a later explicit payoff scene before scene 18.
+- Every scene must move the story forward with new information, a reveal, an obstacle, a consequence or a payoff.
+- Plan 20-45 seconds of spoken progression for scenes 2-18. Put a target_duration_seconds estimate in each plan; actual audio timing is checked after voice generation.
+- Use a pattern interrupt only when it clarifies or changes the viewer's understanding; do not add empty spectacle.
+- Deliver a satisfying resolution in scene 17, then a brief thank-you/Like/Comment/Subscribe/related-next-video invitation in scene 18.
+- Total narration {v['words_min']}-{v['words_max']} words. Keep scene 1 under 12 words and distribute remaining narration across scenes 2-17.
+
+EVIDENCE AND HONESTY
+- Facts must be checkable and linked to research; distinguish observed evidence, published interpretation, hypothesis and unknown.
+- Never invent names, quotations, dates, numbers, source links, or certainty. Qualify unresolved disputes.
+- Use a truthful, surprising reveal supported by evidence, not a fabricated twist.
+- The later claim-to-source checker attaches source IDs; leave each scene's evidence_ids as [] in this draft.
+- Do not restate the same fact in multiple scenes unless the later repetition adds a consequence or payoff.
+
+SCENE-BY-SCENE STORYBOARD
+For every scene return: number, act (1/2/3), title, narration, story_purpose, story_progress, emotion,
+opens_loop (list of IDs), pays_off (list of IDs), pattern_interrupt, information_reveal,
+target_duration_seconds, evidence_ids, visuals (4 stock search phrases) and visual_plan with:
+description, camera_movement, footage_keywords (at least 2 concrete terms), animation, sound_effect,
+music_mood and transition.
+Clearly mark archival evidence vs illustrative/reconstructed imagery in visual descriptions. No unrelated visuals.
+
+Return ONLY JSON:
+{{"central_question":"","title_promise":"","acts":[{{"name":"Act I — ...","scene_numbers":[1,2,3,4,5],"dramatic_question":""}},{{"name":"Act II — ...","scene_numbers":[6,7,8,9,10,11,12,13,14],"dramatic_question":""}},{{"name":"Act III — ...","scene_numbers":[15,16,17,18],"dramatic_question":""}}],
+"open_loops":[{{"id":"L1","question":"","opened_scene":1,"payoff_scene":8}}],
+"scenes":[{{"number":1,"act":1,"title":"","narration":"","story_purpose":"","story_progress":"","emotion":"","opens_loop":["L1"],"pays_off":[],"pattern_interrupt":"","information_reveal":"","target_duration_seconds":4,"evidence_ids":[],"visuals":["","","",""],"visual_plan":{{"description":"","camera_movement":"","footage_keywords":["",""],"animation":"","sound_effect":"","music_mood":"","transition":""}}}}]}}
 VALIDATION FEEDBACK FROM THE PREVIOUS DRAFT (correct each item):
 {feedback}
-HONESTY
-- Separate documented facts from theories ("historians believe", "according to ...").
-- Never invent quotes, statistics, names or sources.
-VISUALS
-- For each scene give 4 stock-footage search queries: concrete visual nouns, 2-4 words, generic enough to
-  exist on Pexels (e.g. "ancient stone ruins", "foggy forest drone", "old handwritten manuscript"). No people's names.
-- Match the REAL place and era of the story: put the region in the query (e.g. "Scotland stormy sea", "Atlantic lighthouse
-  storm"). Prefer moody, overcast, dark footage. Avoid sunny tropical or Mediterranean-looking shots unless the story is set there.
-Lessons from our analytics (apply them):
-{lessons or '- none yet'}
-Return JSON: {{"setting":"place + era keywords for stock searches, e.g. 'Scotland island lighthouse 1900 storm'",
-"wiki_terms":["3-5 specific real places/objects/events that have photos on Wikimedia Commons, e.g. 'Flannan Isles Lighthouse'"],
-"hook_text":"WHERE ARE THEY?",
-"scenes":[{{"title":"short chapter title","emotion":"hushed, suspenseful","narration":"","visuals":["","","",""]}}],"sources":["real reference works/institutions"]}}"""
-    return gemini(prompt, temperature=0.85)
-
+Lessons from channel analytics (apply only when consistent with evidence):
+{lessons or '- none yet'}"""
+    result = gemini(prompt, temperature=0.75)
+    if isinstance(result, dict):
+        result["story_schema_version"] = 1
+        from .story import quality_score
+        result["story_quality"] = quality_score(result, require_evidence=False)
+    return result
 
 def fact_check(script):
     from .evidence import evidence_record, normalize_evidence
