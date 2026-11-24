@@ -39,7 +39,11 @@ def render_shot(asset, d, out, n, punch=False):
             vf = (f"fps={FPS},scale=2400:1350:force_original_aspect_ratio=increase,crop=2400:1350,"
                   f"zoompan=z='min(zoom+0.004,1.28)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1920x1080:fps={FPS},{GRADE}")
         else:
-            vf = f"scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,fps={FPS},{GRADE}"
+            z = ("if(eq(on,1),1.0,min(zoom+0.00022,1.06))" if n % 2 == 0
+                 else "if(eq(on,1),1.06,max(zoom-0.00022,1.0))")
+            vf = (f"scale=2400:1350:force_original_aspect_ratio=increase,crop=2400:1350,fps={FPS},"
+                  f"zoompan=z='{z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:"
+                  f"s=1920x1080:fps={FPS},{GRADE}")
         run(["ffmpeg", "-y", "-stream_loop", "-1", "-i", p, "-t", f"{d}", "-vf", vf, *X264, str(out)])
     else:
         frames = int(d * FPS) + 2
