@@ -242,7 +242,15 @@ def shot_queries(topic, script, scenes, beats_):
     setting = script.get("setting", "")
     for start in range(0, len(flat), 40):
         chunk = flat[start:start + 40]
-        lines = "\n".join(f"{start + k}. [{scenes[si]['title']}] {t[:240]}" for k, (si, t) in enumerate(chunk))
+        beat_lines = []
+        for k, (si, text) in enumerate(chunk):
+            scene = scenes[si]
+            plan = scene.get("visual_plan", {})
+            keywords = plan.get("footage_keywords", []) if isinstance(plan, dict) else []
+            visual_hint = (f"visual={plan.get('description', '')}; camera={plan.get('camera_movement', '')}; "
+                           f"keywords={', '.join(keywords[:4])}" if isinstance(plan, dict) else "")
+            beat_lines.append(f"{start + k}. [{scene.get('title', '')}] narration={text[:240]}; {visual_hint}")
+        lines = "\n".join(beat_lines)
         prompt = f"""You choose stock-footage search queries for a documentary about: {topic['topic']}.
 Real setting: {setting}
 Below are numbered beats: what the narrator says during one ~5 second shot. For EACH beat give:
