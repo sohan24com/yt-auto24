@@ -67,6 +67,17 @@ class PipelineTests(unittest.TestCase):
         self.assertGreaterEqual(start, 20)
         self.assertLessEqual(start + duration, 70)
 
+    def test_script_validator_checks_only_the_opening_sentence(self):
+        from src import script
+        narration = ("A clear question appears in the old text today. "
+                     + " ".join(["detail"] * 11))
+        data = {
+            "scenes": [{"narration": narration} for _ in range(10)],
+            "hook_text": "THE LOST CLUE",
+        }
+        with patch("src.script.cfg", return_value={"video": {"words_min": 100, "words_max": 300}}):
+            self.assertEqual([], script.valid(data))
+
     def test_unmatched_shot_uses_labeled_context_card(self):
         with patch("src.footage._stock", return_value=[]), \
              patch("src.footage._nasa", return_value=[]), \

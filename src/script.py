@@ -73,8 +73,15 @@ def valid(script):
         problems.append("too few scenes")
     if not (v["words_min"] * 0.9 <= w <= v["words_max"] * 1.1):
         problems.append(f"word count {w}")
-    if sc and len(sc[0]["narration"].split()) > 16:
-        problems.append("5-second hook too long")
+    # The hook is the opening sentence. Later narration in Scene 1 must not
+    # make a correctly sized five-second hook fail validation.
+    if sc:
+        opening = str(sc[0].get("narration", "")).strip()
+        ends = [opening.find(mark) for mark in ".?!"]
+        ends = [index for index in ends if index >= 0]
+        first_sentence = opening[:min(ends) + 1] if ends else opening
+        if len(first_sentence.split()) > 12:
+            problems.append("5-second hook too long (max 12 words in opening sentence)")
     hook = str(script.get("hook_text", "")).split()
     if not 3 <= len(hook) <= 5:
         problems.append("hook_text must contain 3-5 words")
