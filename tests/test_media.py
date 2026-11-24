@@ -127,12 +127,13 @@ class PipelineTests(unittest.TestCase):
                             groq_calls[1].kwargs["json"]["model"])
 
     def test_grounded_gemini_failure_does_not_call_groq(self):
-        with self._gemini_test_env(), patch.dict(os.environ, {
-                "GROQ_API_KEY": "groq-key-1",
-        }, clear=False), \\
-             patch("src.common._model_list", return_value=["gemini-model"]), \\
-             patch("src.common.requests.post", return_value=self._gemini_response(400)), \\
-             patch("src.common._groq") as groq:
+        with (
+            self._gemini_test_env(),
+            patch.dict(os.environ, {"GROQ_API_KEY": "groq-key-1"}, clear=False),
+            patch("src.common._model_list", return_value=["gemini-model"]),
+            patch("src.common.requests.post", return_value=self._gemini_response(400)),
+            patch("src.common._groq") as groq,
+        ):
             with self.assertRaises(common.GeminiUnavailableError):
                 common.gemini("fact check", grounding=True, request_timeout=1, total_timeout=5)
         groq.assert_not_called()
