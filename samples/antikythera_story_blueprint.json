@@ -94,7 +94,6 @@
       "act": 1,
       "title": "A machine that predicted eclipses",
       "narration": "Ancient Greeks built a machine that could predict eclipses.",
-      "purpose": "Cold-open with the documented capability; immediately ask how.",
       "story_progress": "State the central puzzle and open L1.",
       "evidence_ids": [
         "NATURE_2006"
@@ -106,7 +105,8 @@
       "reveal": "The object is an astronomical calculator, not an ordinary clock.",
       "emotion": "hushed, astonished",
       "pattern_interrupt": "Macro gear snap-zoom with a single metallic impact.",
-      "visual": {
+      "story_purpose": "Cold-open with the documented capability; immediately ask how.",
+      "visual_plan": {
         "description": "A real fragment photograph, clearly labeled as the surviving artifact, then a restrained gear silhouette.",
         "camera_movement": "Fast push-in, then hold.",
         "footage_keywords": [
@@ -119,14 +119,13 @@
         "music_mood": "suspense",
         "transition": "Hard cut."
       },
-      "target_seconds": 4
+      "target_duration_seconds": 4
     },
     {
       "number": 2,
       "act": 1,
       "title": "A wreck off a small island",
       "narration": "The mechanism came from wreck material near Antikythera, where sponge divers found it among ancient cargo.",
-      "purpose": "Place the artifact in a real archaeological context.",
       "story_progress": "Move from the object to its find context.",
       "evidence_ids": [
         "AMRP_FIND"
@@ -136,7 +135,8 @@
       "reveal": "The machine survived by accident inside a shipwreck.",
       "emotion": "quiet, investigative",
       "pattern_interrupt": "",
-      "visual": {
+      "story_purpose": "Place the artifact in a real archaeological context.",
+      "visual_plan": {
         "description": "Map from Greece to Antikythera; label it as a map, then show a shipwreck illustration.",
         "camera_movement": "Slow map push.",
         "footage_keywords": [
@@ -149,14 +149,13 @@
         "music_mood": "mystery",
         "transition": "Map-line wipe."
       },
-      "target_seconds": 24
+      "target_duration_seconds": 24
     },
     {
       "number": 3,
       "act": 1,
       "title": "The first puzzle",
       "narration": "What surfaced was corroded bronze, crowded with gear teeth and writing too small to read at a glance.",
-      "purpose": "Show why the artifact resisted easy explanation.",
       "story_progress": "Establish that the clues are physically difficult to read.",
       "evidence_ids": [
         "SCI_REPORTS_2021"
@@ -166,7 +165,8 @@
       "reveal": "The inscriptions are evidence, not decoration.",
       "emotion": "curious, restrained",
       "pattern_interrupt": "",
-      "visual": {
+      "story_purpose": "Show why the artifact resisted easy explanation.",
+      "visual_plan": {
         "description": "Museum photography or a clearly labeled illustrative macro of corroded bronze.",
         "camera_movement": "Macro pan across texture.",
         "footage_keywords": [
@@ -179,14 +179,13 @@
         "music_mood": "curiosity",
         "transition": "Match cut to engraved lettering."
       },
-      "target_seconds": 29
+      "target_duration_seconds": 29
     },
     {
       "number": 4,
       "act": 1,
       "title": "A computer in fragments",
       "narration": "Modern research describes 82 surviving fragments and 30 known bronze gear wheels, but the pieces do not preserve the whole machine.",
-      "purpose": "Set the scale of loss without pretending the reconstruction is complete.",
       "story_progress": "Quantify what survives and what does not.",
       "evidence_ids": [
         "SCI_REPORTS_2021"
@@ -196,7 +195,8 @@
       "reveal": "Only a partial machine remains.",
       "emotion": "somber, precise",
       "pattern_interrupt": "The full gear graphic breaks into fragments.",
-      "visual": {
+      "story_purpose": "Set the scale of loss without pretending the reconstruction is complete.",
+      "visual_plan": {
         "description": "Evidence image beside a labeled fragment-count graphic; reconstructed pieces use a different color.",
         "camera_movement": "Pull back to reveal missing space.",
         "footage_keywords": [
@@ -209,14 +209,13 @@
         "music_mood": "somber",
         "transition": "Cut on the last fragment."
       },
-      "target_seconds": 31
+      "target_duration_seconds": 31
     },
     {
       "number": 5,
       "act": 1,
       "title": "The question sharpens",
       "narration": "If the front is missing and the metal is unreadable, how can anyone know what the machine calculated?",
-      "purpose": "Turn the loss into the investigation's central method question.",
       "story_progress": "Promise a method-based answer rather than a miracle reveal.",
       "evidence_ids": [
         "SCI_REPORTS_2021"
@@ -226,7 +225,8 @@
       "reveal": "The answer must come from imaging, inscriptions, and gear geometry.",
       "emotion": "tense, questioning",
       "pattern_interrupt": "",
-      "visual": {
+      "story_purpose": "Turn the loss into the investigation's central method question.",
+      "visual_plan": {
         "description": "Black field, fragment outline, then an X-ray-style cutaway labeled reconstruction.",
         "camera_movement": "Slow push through a fragment.",
         "footage_keywords": [
@@ -239,14 +239,13 @@
         "music_mood": "suspense",
         "transition": "X-ray flash to lab."
       },
-      "target_seconds": 30
+      "target_duration_seconds": 30
     },
     {
       "number": 6,
       "act": 2,
       "title": "Seeing inside bronze",
       "narration": "Researchers used high-resolution X-ray tomography to inspect structures and inscriptions hidden inside surviving fragments.",
-      "purpose": "Introduce the investigative tool and show evidence being recovered.",
       "story_progress": "Move from mystery to a repeatable research method.",
       "evidence_ids": [
         "NATURE_2006",
@@ -257,7 +256,8 @@
       "reveal": "Imaging lets researchers examine hidden surfaces without treating guesses as facts.",
       "emotion": "focused, rising",
       "pattern_interrupt": "",
-      "visual": {
+      "story_purpose": "Introduce the investigative tool and show evidence being recovered.",
+      "visual_plan": {
         "description": "Research paper figure or a clearly labeled tomography visualization beside lab equipment.",
         "camera_movement": "Measured scan-line move.",
         "footage_keywords": [
@@ -270,14 +270,13 @@
         "music_mood": "investigative",
         "transition": "Wipe through scan slice."
       },
-      "target_seconds": 33
+      "target_duration_seconds": 33
     },
     {
       "number": 7,
       "act": 2,
       "title": "A dial with a long memory",
       "narration": "The rear dials encoded repeating calendar and eclipse cycles; the pattern turned moving gears into a way to track time.",
-      "purpose": "Explain how cyclical motion can encode astronomical time.",
       "story_progress": "Connect physical gears to a measurable cycle.",
       "evidence_ids": [
         "NATURE_2006"
@@ -287,7 +286,8 @@
       "reveal": "The machine represented recurring patterns, not supernatural foresight.",
       "emotion": "clear, intrigued",
       "pattern_interrupt": "Animate one ring turning as the rest of the frame freezes.",
-      "visual": {
+      "story_purpose": "Explain how cyclical motion can encode astronomical time.",
+      "visual_plan": {
         "description": "Back-dial evidence image, with any clean dial overlay labeled as a diagram.",
         "camera_movement": "Orbit around a flat dial graphic.",
         "footage_keywords": [
@@ -300,14 +300,13 @@
         "music_mood": "wonder",
         "transition": "Rotating dial match cut."
       },
-      "target_seconds": 32
+      "target_duration_seconds": 32
     },
     {
       "number": 8,
       "act": 2,
       "title": "How the eclipse prediction worked",
       "narration": "A 2006 study reported that the mechanism predicted lunar and solar eclipses through cycles based on Babylonian arithmetic progressions.",
-      "purpose": "Pay off L1 with the documented mechanism, carefully attributed.",
       "story_progress": "Answer the opening question with the cited research result.",
       "evidence_ids": [
         "NATURE_2006"
@@ -319,7 +318,8 @@
       "reveal": "The prediction came from encoded cycles, not an unexplained leap in technology.",
       "emotion": "awed, explanatory",
       "pattern_interrupt": "Eclipse shadow crosses a clean cycle chart.",
-      "visual": {
+      "story_purpose": "Pay off L1 with the documented mechanism, carefully attributed.",
+      "visual_plan": {
         "description": "Research-backed eclipse-cycle diagram; mark the graphic as an explanatory animation, not original footage.",
         "camera_movement": "Track along numbered cycle marks.",
         "footage_keywords": [
@@ -332,14 +332,13 @@
         "music_mood": "revelation",
         "transition": "Eclipse wipe."
       },
-      "target_seconds": 34
+      "target_duration_seconds": 34
     },
     {
       "number": 9,
       "act": 2,
       "title": "The writing on the machine",
       "narration": "Inscriptions also describe the Sun, Moon, and planets known in antiquity, raising a larger question about the machine's front.",
-      "purpose": "Introduce the new evidence and open L2.",
       "story_progress": "Expand from eclipse cycles to the contested front display.",
       "evidence_ids": [
         "SCI_REPORTS_2021"
@@ -351,7 +350,8 @@
       "reveal": "Text clues point toward more than the surviving rear dials.",
       "emotion": "curious, rising",
       "pattern_interrupt": "",
-      "visual": {
+      "story_purpose": "Introduce the new evidence and open L2.",
+      "visual_plan": {
         "description": "Published inscription images or close detail; reconstructed text marked as transcription.",
         "camera_movement": "Slow lateral move over letters.",
         "footage_keywords": [
@@ -364,14 +364,13 @@
         "music_mood": "mystery",
         "transition": "Cut from letters to gears."
       },
-      "target_seconds": 31
+      "target_duration_seconds": 31
     },
     {
       "number": 10,
       "act": 2,
       "title": "A more ambitious reconstruction",
       "narration": "A 2021 research team proposed a front display model that could represent the ancient Greek cosmos using compact gearing.",
-      "purpose": "Present the reconstruction as a published proposal, not settled artifact fact.",
       "story_progress": "Show the leading model and qualify its status.",
       "evidence_ids": [
         "SCI_REPORTS_2021"
@@ -381,7 +380,8 @@
       "reveal": "A detailed model is not the same as a complete surviving machine.",
       "emotion": "awed, cautious",
       "pattern_interrupt": "Exploded-view animation, labeled proposed model.",
-      "visual": {
+      "story_purpose": "Present the reconstruction as a published proposal, not settled artifact fact.",
+      "visual_plan": {
         "description": "Use the 2021 paper's reconstruction figure or an original labeled diagram.",
         "camera_movement": "Slow exploded-view drift.",
         "footage_keywords": [
@@ -394,14 +394,13 @@
         "music_mood": "wonder",
         "transition": "Layer stack dissolves."
       },
-      "target_seconds": 33
+      "target_duration_seconds": 33
     },
     {
       "number": 11,
       "act": 2,
       "title": "The clues that fit",
       "narration": "The model combines inscription readings, surviving gear geometry, and astronomical period relations to explain how a compact display might work.",
-      "purpose": "Explain the basis of the 2021 proposal without implying consensus beyond the article.",
       "story_progress": "Show multiple constraints converging on one reconstruction.",
       "evidence_ids": [
         "SCI_REPORTS_2021"
@@ -411,7 +410,8 @@
       "reveal": "The reconstruction is constrained by evidence, though some parts remain hypothetical.",
       "emotion": "analytical, confident",
       "pattern_interrupt": "",
-      "visual": {
+      "story_purpose": "Explain the basis of the 2021 proposal without implying consensus beyond the article.",
+      "visual_plan": {
         "description": "Three evidence columns converge on a clearly marked hypothetical gear layout.",
         "camera_movement": "Slide from evidence to model.",
         "footage_keywords": [
@@ -424,14 +424,13 @@
         "music_mood": "investigative",
         "transition": "Three-panel merge."
       },
-      "target_seconds": 34
+      "target_duration_seconds": 34
     },
     {
       "number": 12,
       "act": 2,
       "title": "Why a model can be elegant",
       "narration": "A reconstruction can satisfy the known clues and still describe parts that no fragment preserves directly.",
-      "purpose": "Teach viewers how historical reconstruction handles missing evidence.",
       "story_progress": "Prepare the audience to distinguish evidence from inference.",
       "evidence_ids": [
         "SCI_REPORTS_2021",
@@ -442,7 +441,8 @@
       "reveal": "Fit to evidence strengthens a model but does not turn every component into an observed fact.",
       "emotion": "measured, reflective",
       "pattern_interrupt": "Hypothetical parts fade away, leaving observed fragments.",
-      "visual": {
+      "story_purpose": "Teach viewers how historical reconstruction handles missing evidence.",
+      "visual_plan": {
         "description": "Side-by-side fragment and reconstruction, with direct evidence separated from inferred parts.",
         "camera_movement": "Rack focus between fragment and model.",
         "footage_keywords": [
@@ -455,14 +455,13 @@
         "music_mood": "reflection",
         "transition": "Soft dissolve."
       },
-      "target_seconds": 31
+      "target_duration_seconds": 31
     },
     {
       "number": 13,
       "act": 2,
       "title": "The missing front",
       "narration": "The 2021 authors explicitly note that evidence for the Sun and planetary mechanisms is missing, so parts of their model are theoretical.",
-      "purpose": "State the key limit directly and prepare payoff for L2.",
       "story_progress": "Name what cannot be demonstrated from surviving components.",
       "evidence_ids": [
         "SCI_REPORTS_2021"
@@ -472,7 +471,8 @@
       "reveal": "The planets display is a proposal constrained by clues, not a fully recovered original assembly.",
       "emotion": "somber, exact",
       "pattern_interrupt": "",
-      "visual": {
+      "story_purpose": "State the key limit directly and prepare payoff for L2.",
+      "visual_plan": {
         "description": "Show surviving fragments first, then dashed outlines for theoretical gearing.",
         "camera_movement": "Hold on gaps in the fragments.",
         "footage_keywords": [
@@ -485,14 +485,13 @@
         "music_mood": "tension",
         "transition": "Dashed lines fade."
       },
-      "target_seconds": 30
+      "target_duration_seconds": 30
     },
     {
       "number": 14,
       "act": 2,
       "title": "The honest answer",
       "narration": "The planet-display proposal answers what may have fit; it does not prove that every reconstructed gear existed exactly this way.",
-      "purpose": "Resolve L2 with a calibrated conclusion.",
       "story_progress": "Pay off the planetary-display question without overstating certainty.",
       "evidence_ids": [
         "SCI_REPORTS_2021"
@@ -504,7 +503,8 @@
       "reveal": "The strongest answer is a bounded reconstruction, not a claim of certainty.",
       "emotion": "clear, grounded",
       "pattern_interrupt": "A bold model title is replaced by a smaller “proposed reconstruction” label.",
-      "visual": {
+      "story_purpose": "Resolve L2 with a calibrated conclusion.",
+      "visual_plan": {
         "description": "Reconstruction model beside the paper's limitation statement.",
         "camera_movement": "Pull back to show both evidence and uncertainty.",
         "footage_keywords": [
@@ -517,14 +517,13 @@
         "music_mood": "resolution",
         "transition": "Match dissolve."
       },
-      "target_seconds": 32
+      "target_duration_seconds": 32
     },
     {
       "number": 15,
       "act": 3,
       "title": "What is still unknown",
       "narration": "The device's origin, exact context, and purpose still carry uncertainty, even where its astronomical functions are well studied.",
-      "purpose": "Separate functional evidence from broader unanswered historical questions.",
       "story_progress": "Leave a truthful mystery after resolving the technical puzzle.",
       "evidence_ids": [
         "NATURE_REVIEW_2018"
@@ -534,7 +533,8 @@
       "reveal": "Knowing what a machine calculated does not identify its maker or full social purpose.",
       "emotion": "quiet, reflective",
       "pattern_interrupt": "",
-      "visual": {
+      "story_purpose": "Separate functional evidence from broader unanswered historical questions.",
+      "visual_plan": {
         "description": "Artifact in museum context, with no invented portrait of its maker.",
         "camera_movement": "Slow pull-back into darkness.",
         "footage_keywords": [
@@ -547,14 +547,13 @@
         "music_mood": "reflective",
         "transition": "Fade to artifact."
       },
-      "target_seconds": 30
+      "target_duration_seconds": 30
     },
     {
       "number": 16,
       "act": 3,
       "title": "The true scale of the achievement",
       "narration": "What survives is enough to show an ancient technology built around mathematical cycles, intricate gears, and careful astronomical observation.",
-      "purpose": "Deliver the emotional meaning grounded in evidence.",
       "story_progress": "Reframe the story around demonstrated ingenuity rather than a mythic lost civilization.",
       "evidence_ids": [
         "NATURE_2006",
@@ -565,7 +564,8 @@
       "reveal": "The wonder is not that the machine did everything; it is what the evidence shows it could do.",
       "emotion": "awed, warm",
       "pattern_interrupt": "The music opens as observed gear teeth turn in sequence.",
-      "visual": {
+      "story_purpose": "Deliver the emotional meaning grounded in evidence.",
+      "visual_plan": {
         "description": "Artifact details and simple cycle animation, clearly separated from the speculative full model.",
         "camera_movement": "Slow orbit over documented fragment photography.",
         "footage_keywords": [
@@ -578,27 +578,25 @@
         "music_mood": "emotional wonder",
         "transition": "Gear-to-star dissolve."
       },
-      "target_seconds": 34
+      "target_duration_seconds": 34
     },
     {
       "number": 17,
       "act": 3,
       "title": "The payoff",
       "narration": "So how did it predict eclipses? By turning recurring astronomical cycles into motion; the broken gears preserve part of that calculation, not every answer.",
-      "purpose": "Return to the opening and state the complete, nuanced answer.",
       "story_progress": "Close L1 and summarize the boundary between known and unknown.",
       "evidence_ids": [
         "NATURE_2006",
         "NATURE_REVIEW_2018"
       ],
       "opens_loop": [],
-      "pays_off": [
-        "L1"
-      ],
+      "pays_off": [],
       "reveal": "The mechanism's achievement is real, and the missing evidence still matters.",
       "emotion": "satisfying, calm",
       "pattern_interrupt": "",
-      "visual": {
+      "story_purpose": "Return to the opening and state the complete, nuanced answer.",
+      "visual_plan": {
         "description": "Cycle animation resolves into the surviving fragment; label diagram as explanatory.",
         "camera_movement": "Push from orbit diagram back to artifact.",
         "footage_keywords": [
@@ -611,14 +609,13 @@
         "music_mood": "satisfying",
         "transition": "Slow fade."
       },
-      "target_seconds": 35
+      "target_duration_seconds": 35
     },
     {
       "number": 18,
       "act": 3,
       "title": "Outro and next question",
       "narration": "If this evidence-first mystery stayed with you, thank you for watching. Like, comment, and subscribe, and join the next documentary as we investigate another machine history nearly lost.",
-      "purpose": "Short natural CTA after the story has reached a satisfying conclusion.",
       "story_progress": "Invite a return through a related evidence-led story.",
       "evidence_ids": [],
       "opens_loop": [],
@@ -626,7 +623,8 @@
       "reveal": "",
       "emotion": "warm, inviting",
       "pattern_interrupt": "",
-      "visual": {
+      "story_purpose": "Short natural CTA after the story has reached a satisfying conclusion.",
+      "visual_plan": {
         "description": "Quiet artifact end card with space for a related documentary card; no fabricated thumbnail.",
         "camera_movement": "Gentle pull-out.",
         "footage_keywords": [
@@ -638,12 +636,13 @@
         "music_mood": "warm outro",
         "transition": "Fade out."
       },
-      "target_seconds": 25
+      "target_duration_seconds": 25
     }
   ],
   "limitations": [
     "This blueprint is a planning sample, not a finished narrated video.",
     "The 2021 front-display account is a published reconstruction; missing components make parts theoretical.",
     "The sample's timing targets are estimates; production must replace them with measured voice file durations."
-  ]
+  ],
+  "story_schema_version": 1
 }
