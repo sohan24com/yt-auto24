@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -7,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from src import edit, footage, pipeline, shorts
+from src import common, edit, footage, google_auth, pipeline, shorts
 
 
 class PipelineTests(unittest.TestCase):
@@ -34,6 +35,81 @@ class PipelineTests(unittest.TestCase):
         errors = pipeline.media_problems(
             self.source, expected_duration=9.0, min_bytes=0)
         self.assertTrue(any("duration" in error for error in errors))
+
+    @staticmethod
+    def _gemini_response(status, payload=None, text=""):
+        payload = payload or {}
+        return SimpleNamespace(status_code=status, text=text, json=lambda: payload)
+
+    def _gemini_test_env(self):
+        return patch.dict(os.environ, {
+            "GEMINI_API_KEY": "test-key-1",
+            "GEMINI_API_KEY_2": "test-key-2",
+            "GEMINI_API_KEY_3": "",
+            "GEMINI_API_KEY_4": "",
+            "GEMINI_API_KEY_5": "",
+        }, clear=False)
+
+    def test_gemini_rotates_to_next_key_on_quota(self):
+        success = {"candidates": [{"content": {"parts": [{"text": "{\\"ok\\": true}"}]}}]}
+        with self._gemini_test_env(), \\
+             patch("src.common._model_list", return_value=["model-a"]), \\
+             patch("src.common.requests.post", side_effect=[
+                 self._gemini_response(429, text="quota"),
+                 self._gemini_response(200, success),
+             ]) as post:
+            result = common.gemini("test prompt", request_timeout=1, total_timeout=5)
+        self.assertTrue(result["ok"])
+        self.assertEqual(["test-key-1", "test-key-2"],
+                         [call.kwargs["params"]["key"] for call in post.call_args_list])
+
+    def test_gemini_moves_to_next_model_on_capacity_error(self):
+        success = {"candidates": [{"content": {"parts": [{"text": "{\\"ok\\": true}"}]}}]}
+        with self._gemini_test_env(), \\
+             patch("src.common._model_list", return_value=["model-a", "model-b"]), \\
+             patch("src.common.requests.post", side_effect=[
+                 self._gemini_response(503, text="high demand"),
+                 self._gemini_response(200, success),
+             ]) as post, \\
+             patch("src.common.time.sleep"):
+            result = common.gemini("test prompt", request_timeout=1, total_timeout=5)
+        self.assertTrue(result["ok"])
+        self.assertIn("/model-b:", post.call_args_list[1].args[0])
+        self.assertEqual("test-key-1", post.call_args_list[1].kwargs["params"]["key"])
+
+    def test_gemini_exhaustion_is_bounded_and_descriptive(self):
+        failures = [self._gemini_response(403, text="free tier unavailable") for _ in range(4)]
+        with self._gemini_test_env(), \\
+             patch("src.common._model_list", return_value=["model-a", "model-b"]), \\
+             patch("src.common.requests.post", side_effect=failures) as post:
+            with self.assertRaises(common.GeminiUnavailableError) as error:
+                common.gemini("test prompt", request_timeout=1, total_timeout=5)
+        self.assertEqual(4, post.call_count)
+        self.assertIn("HTTP 403 x4", str(error.exception))
+
+    def test_footage_candidate_match_metadata_uses_candidate_text(self):
+        footage.reset()
+        candidate = ("image", "pexels-p123", "https://example.test/a.jpg",
+                     "Pexels", "ancient bronze gears")
+        with patch("src.footage._download", return_value=True):
+            asset = footage._try([candidate], "ancient bronze gears", set(), self.wd, 1)
+        self.assertEqual(3, asset["match_score"])
+        self.assertTrue({"ancient", "bronze", "gears"}.issubset(asset["match_words"]))
+
+    def test_existing_youtube_token_scopes_remain_compatible(self):
+        self.assertNotIn("https://www.googleapis.com/auth/youtube.force-ssl",
+                         google_auth.YT_SCOPES)
+
+    def test_script_retry_prompt_includes_validation_feedback(self):
+        from src import script
+        with patch("src.script.cfg", return_value={
+                "video": {"words_min": 100, "words_max": 300},
+                "channel": {"tone": "curious"}}), \\
+             patch("src.script.load_insights", return_value={"lessons": []}), \\
+             patch("src.script.gemini", return_value={}) as gemini_call:
+            script.write_script({"topic": "Test topic", "angle": "A real question"},
+                                validation_feedback=["5-second hook too long"])
+        self.assertIn("5-second hook too long", gemini_call.call_args.args[0])
 
     def test_ffprobe_missing_stream_durations_fall_back_to_container(self):
         output = {
