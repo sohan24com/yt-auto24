@@ -14,7 +14,7 @@ uploads media that fails the media probes.
    The code tries configured keys across Gemini requests; Gemini TTS also moves to the next key after a failure.
    Add keys from separate Google Cloud projects if you need separate project quotas; multiple keys in one
    project generally share that project's quota.
-3. **Optional Groq text fallback**: add `GROQ_API_KEY` and `GROQ_API_KEY_2` as Actions secrets. It is tried only if Gemini fails for ordinary text/JSON generation; Google Search fact-check stays on Gemini. Groq rate limits are shared by keys in the same organization, so extra keys there do not add quota.
+3. **Optional Groq text fallback**: add `GROQ_API_KEY` and `GROQ_API_KEY_2` as Actions secrets. It is tried only if Gemini fails for ordinary text/JSON generation; Google Search fact-check stays on Gemini. Groq rate limits are shared by keys in the same organization, so extra keys there do not add quota. Use only while your Groq organization is on the Free tier; upgrading to the paid Developer tier can charge per token.
 4. **Pexels key**: https://www.pexels.com/api/ -> secret `PEXELS_API_KEY`.
 5. **Google Cloud** (console.cloud.google.com), one project:
    - Enable: YouTube Data API v3, YouTube Analytics API, Google Drive API.
