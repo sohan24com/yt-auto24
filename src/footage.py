@@ -245,14 +245,12 @@ def _context_card(query, beat, setting, wd):
     dest = Path(wd) / f"context-{key}.png"
     if not dest.exists():
         w, h = 1920, 1080
-        im = Image.new("RGB", (w, h))
-        px = im.load()
-        for y in range(h):
-            shade = int(12 + 23 * (1 - y / h))
-            for x in range(w):
-                glow = int(18 * (1 - x / w))
-                px[x, y] = (shade + glow, shade + glow + 5, shade + glow + 16)
+        im = Image.new("RGB", (w, h), (17, 20, 34))
         d = ImageDraw.Draw(im)
+        for radius in (260, 390, 520):
+            d.ellipse((w - radius, 100 - radius, w + radius, 100 + radius),
+                      outline=(42, 49, 69), width=5)
+        d.rectangle((0, 0, w, 14), fill=(174, 111, 42))
         try:
             font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
             label_font = ImageFont.truetype(font_path, 36)
