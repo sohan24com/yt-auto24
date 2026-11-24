@@ -25,5 +25,5 @@ if which == "youtube":
 else:
     output = Path(__file__).resolve().parent / ".drive_refresh_token"
 
-output.write_text(creds.refresh_token + "\\n", encoding="utf-8")
+output.write_text(creds.refresh_token + "\n", encoding="utf-8")
 print(f"Refresh token saved locally to {output.name}; its value was not displayed.")
