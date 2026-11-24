@@ -37,14 +37,16 @@ class CloudflareFallbackTests(unittest.TestCase):
         self.assertEqual(result, {"script": "ok"})
         cf.assert_called_once()
 
-    def test_grounded_calls_do_not_use_ungrounded_fallbacks(self):
+    def test_grounded_calls_use_search_but_never_ungrounded_providers(self):
         with patch.object(common, "_gemini", side_effect=common.GeminiUnavailableError("gemini quota")), \
-             patch.object(common, "_groq") as groq, \
-             patch.object(common, "_cloudflare") as cf:
-            with self.assertRaises(common.GeminiUnavailableError):
-                common.gemini("verify claim", grounding=True)
-        groq.assert_not_called()
+             patch.object(common, "_groq", return_value={"sources": ["search result"]}) as groq, \
+             patch.object(common, "_cloudflare") as cf, \
+             patch.object(common, "_openrouter") as router:
+            result = common.gemini("verify claim", grounding=True)
+        self.assertEqual(["search result"], result["sources"])
+        self.assertTrue(groq.call_args.kwargs["grounding"])
         cf.assert_not_called()
+        router.assert_not_called()
 
     def test_openrouter_uses_free_router_and_parses_json(self):
         response = unittest.mock.Mock()
