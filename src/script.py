@@ -51,7 +51,7 @@ Return JSON: {{"setting":"place + era keywords for stock searches, e.g. 'Scotlan
 
 
 def fact_check(script):
-    prompt = f"""You are a strict documentary fact-checker. Use Google Search to verify every factual claim
+    prompt = f"""You are a strict documentary fact-checker. Use the available live web-search tool to verify every factual claim
 (dates, names, numbers, causes) in this script. Fix errors. Remove or hedge anything you cannot verify.
 Keep the same structure, tone and length (within 10%). Keep every scene's "visuals" unchanged.
 Return ONLY JSON: {{"scenes":[...same format...],"sources":["urls or publication names actually used"],"changes":["what you changed"]}}
@@ -60,7 +60,8 @@ SCRIPT:
 {script}"""
     try:
         out = gemini(prompt, grounding=True, temperature=0.2)
-        if out.get("scenes") and len(out["scenes"]) >= 8:
+        if (out.get("scenes") and len(out["scenes"]) >= 8
+                and isinstance(out.get("sources"), list) and out["sources"]):
             return out
     except Exception as e:
         print("fact_check failed, keeping original:", e)
