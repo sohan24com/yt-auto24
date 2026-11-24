@@ -36,7 +36,7 @@ EVIDENCE AND HONESTY
 - Do not restate the same fact in multiple scenes unless the later repetition adds a consequence or payoff.
 
 SCENE-BY-SCENE STORYBOARD
-For every scene return: number, act (1/2/3), title, narration, story_purpose, story_progress, emotion,
+For every scene return: number, act (1/2/3), title, narration, story_purpose, story_progress, causal_link, visual_anchor, emotion,
 opens_loop (list of IDs), pays_off (list of IDs), pattern_interrupt, information_reveal,
 target_duration_seconds, evidence_ids, visuals (4 stock search phrases) and visual_plan with:
 description, camera_movement, footage_keywords (at least 2 concrete terms), animation, sound_effect,
@@ -46,7 +46,7 @@ Clearly mark archival evidence vs illustrative/reconstructed imagery in visual d
 Return ONLY JSON:
 {{"central_question":"","title_promise":"","acts":[{{"name":"Act I — ...","scene_numbers":[1,2,3,4,5],"dramatic_question":""}},{{"name":"Act II — ...","scene_numbers":[6,7,8,9,10,11,12,13,14],"dramatic_question":""}},{{"name":"Act III — ...","scene_numbers":[15,16,17,18],"dramatic_question":""}}],
 "open_loops":[{{"id":"L1","question":"","opened_scene":1,"payoff_scene":8}}],
-"scenes":[{{"number":1,"act":1,"title":"","narration":"","story_purpose":"","story_progress":"","emotion":"","opens_loop":["L1"],"pays_off":[],"pattern_interrupt":"","information_reveal":"","target_duration_seconds":4,"evidence_ids":[],"visuals":["","","",""],"visual_plan":{{"description":"","camera_movement":"","footage_keywords":["",""],"animation":"","sound_effect":"","music_mood":"","transition":""}}}}]}}
+"scenes":[{{"number":1,"act":1,"title":"","narration":"","story_purpose":"","story_progress":"","causal_link":"","visual_anchor":"","emotion":"","opens_loop":["L1"],"pays_off":[],"pattern_interrupt":"","information_reveal":"","target_duration_seconds":4,"evidence_ids":[],"visuals":["","","",""],"visual_plan":{{"description":"","camera_movement":"","footage_keywords":["",""],"animation":"","sound_effect":"","music_mood":"","transition":""}}}}]}}
 VALIDATION FEEDBACK FROM THE PREVIOUS DRAFT (correct each item):
 {feedback}
 Lessons from channel analytics (apply only when consistent with evidence):
