@@ -1,4 +1,5 @@
 import time
+import re
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
@@ -28,7 +29,7 @@ def find_upload_by_tag(tag):
     The tag is private video metadata rather than visible description text. Search
     stops once playlist entries are older than the YYYYMMDD date embedded in tag.
     """
-    match = __import__("re").search(r"yt-auto24-id-(\\d{8})-", str(tag))
+    match = re.search(r"yt-auto24-id-(\d{8})-", str(tag))
     if not match:
         raise ValueError("idempotency tag must contain a YYYYMMDD date")
     target_day = match.group(1)
