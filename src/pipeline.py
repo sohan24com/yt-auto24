@@ -50,6 +50,11 @@ def build_once(wd):
     voice_wav, durs, engine = V.build_voice(scenes, wd)
     total = sum(durs)
     print(f"voice {total:.0f}s ({engine})")
+    limits = cfg()["video"]
+    if not (limits["min_seconds"] <= total <= limits["max_seconds"]):
+        problem = f"voice duration {total:.0f}s outside {limits['min_seconds']}-{limits['max_seconds']}"
+        print("QUALITY GATE failed before footage:", problem)
+        return topic, script, scenes, durs, [], Path(wd) / "final.mp4", total, [problem]
 
     plans = [E.plan_shots(d, fast=10.0 if i == 0 else 0.0) for i, d in enumerate(durs)]   # cold open = fast cuts
     queries = S.shot_queries(topic, script, scenes, S.beats(scenes, durs, plans))
