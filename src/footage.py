@@ -227,13 +227,13 @@ def wiki_pool(terms, wd):
 def _try(cands, q, used, wd, min_score):
     ranked = sorted((c for c in cands if c[1] not in used and _score(q, c[4]) >= min_score),
                     key=lambda c: (-_score(q, c[4]), c[0] != "video", random.random()))
-    for kind, uid, url, source, _ in ranked[:4]:
+    for kind, uid, url, source, match_text in ranked[:4]:
         dest = Path(wd) / f"{uid}.{'mp4' if kind == 'video' else 'jpg'}"
         if dest.exists() or _download(url, dest):
             used.add(uid)
             credits.add(source)
             a = {"path": dest, "kind": kind, "reused": False, "source": source,
-                 "match_words": _words(q + " " + text), "match_score": _score(q, text)}
+                 "match_words": _words(q + " " + match_text), "match_score": _score(q, match_text)}
             _all.append(a)
             return a
     return None
