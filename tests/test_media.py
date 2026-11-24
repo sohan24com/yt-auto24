@@ -70,6 +70,25 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(out.is_file())
         self.assertGreater(out.stat().st_size, 1000)
 
+    def test_metadata_falls_back_without_gemini_and_keeps_claims_grounded(self):
+        from src import script
+        topic = {"topic": "The Antikythera Mechanism", "angle": "How ancient gears tracked the stars",
+                 "category": "history"}
+        scenes = [(0, {"title": "Bronze gears"}), (30, {"title": "The star calendar"})]
+        with patch("src.script.gemini", side_effect=RuntimeError("quota exhausted")):
+            meta = script.make_metadata(topic, scenes, [], "Generated context cards")
+        self.assertEqual(3, len(meta["thumb_texts"]))
+        self.assertIn("Antikythera", meta["title"])
+        self.assertIn("The Antikythera Mechanism", meta["description"])
+
+    def test_script_validator_rejects_long_hook(self):
+        from src import script
+        scene = {"narration": " ".join(["word"] * 20)}
+        data = {"scenes": [scene] * 10, "hook_text": "THE LOST CLUE"}
+        with patch("src.script.cfg", return_value={"video": {"words_min": 100, "words_max": 300}}):
+            problems = script.valid(data)
+        self.assertTrue(any("hook" in problem for problem in problems))
+
     def test_subtitle_file_contains_source_labels(self):
         ass = self.wd / "captions.ass"
         scenes = [{"title": "A clue", "narration": "A specific fact changes the story."}]
