@@ -52,8 +52,8 @@ class PipelineTests(unittest.TestCase):
 
     def test_gemini_rotates_to_next_key_on_quota(self):
         success = {"candidates": [{"content": {"parts": [{"text": '{"ok": true}'}]}}]}
-        with self._gemini_test_env(), \\
-             patch("src.common._model_list", return_value=["model-a"]), \\
+        with self._gemini_test_env(), \
+             patch("src.common._model_list", return_value=["model-a"]), \
              patch("src.common.requests.post", side_effect=[
                  self._gemini_response(429, text="quota"),
                  self._gemini_response(200, success),
@@ -65,12 +65,12 @@ class PipelineTests(unittest.TestCase):
 
     def test_gemini_moves_to_next_model_on_capacity_error(self):
         success = {"candidates": [{"content": {"parts": [{"text": '{"ok": true}'}]}}]}
-        with self._gemini_test_env(), \\
-             patch("src.common._model_list", return_value=["model-a", "model-b"]), \\
+        with self._gemini_test_env(), \
+             patch("src.common._model_list", return_value=["model-a", "model-b"]), \
              patch("src.common.requests.post", side_effect=[
                  self._gemini_response(503, text="high demand"),
                  self._gemini_response(200, success),
-             ]) as post, \\
+             ]) as post, \
              patch("src.common.time.sleep"):
             result = common.gemini("test prompt", request_timeout=1, total_timeout=5)
         self.assertTrue(result["ok"])
@@ -79,8 +79,8 @@ class PipelineTests(unittest.TestCase):
 
     def test_gemini_exhaustion_is_bounded_and_descriptive(self):
         failures = [self._gemini_response(403, text="free tier unavailable") for _ in range(4)]
-        with self._gemini_test_env(), \\
-             patch("src.common._model_list", return_value=["model-a", "model-b"]), \\
+        with self._gemini_test_env(), \
+             patch("src.common._model_list", return_value=["model-a", "model-b"]), \
              patch("src.common.requests.post", side_effect=failures) as post:
             with self.assertRaises(common.GeminiUnavailableError) as error:
                 common.gemini("test prompt", request_timeout=1, total_timeout=5)
@@ -104,8 +104,8 @@ class PipelineTests(unittest.TestCase):
         from src import script
         with patch("src.script.cfg", return_value={
                 "video": {"words_min": 100, "words_max": 300},
-                "channel": {"tone": "curious"}}), \\
-             patch("src.script.load_insights", return_value={"lessons": []}), \\
+                "channel": {"tone": "curious"}}), \
+             patch("src.script.load_insights", return_value={"lessons": []}), \
              patch("src.script.gemini", return_value={}) as gemini_call:
             script.write_script({"topic": "Test topic", "angle": "A real question"},
                                 validation_feedback=["5-second hook too long"])
