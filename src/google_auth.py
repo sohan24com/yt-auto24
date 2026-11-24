@@ -1,8 +1,9 @@
 from google.oauth2.credentials import Credentials
 from .common import env
 
+# Keep refresh requests compatible with tokens already issued before optional Shorts comments.
+# Newly authorized tokens can also carry youtube.force-ssl; do not require that scope from old tokens.
 YT_SCOPES = ["https://www.googleapis.com/auth/youtube",
-             "https://www.googleapis.com/auth/youtube.force-ssl",
              "https://www.googleapis.com/auth/yt-analytics.readonly"]
 DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
