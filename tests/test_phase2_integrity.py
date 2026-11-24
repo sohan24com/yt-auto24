@@ -60,7 +60,7 @@ class QualityTests(unittest.TestCase):
     def test_ass_subtitles_reject_out_of_range_timestamps(self):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "subs.ass"
-            path.write_text("Dialogue: 0,0:00:00.00,0:00:03.00,Main,,0,0,0,,Hello\\n" * 8,
+            path.write_text("Dialogue: 0,0:00:00.00,0:00:03.00,Main,,0,0,0,,Hello\n" * 8,
                             encoding="utf-8")
             self.assertIn("subtitle event outside video duration", quality.validate_ass(path, 2.0))
 
@@ -103,8 +103,8 @@ class UploadIdempotencyTests(unittest.TestCase):
         service = Mock()
         service.videos.return_value.insert.return_value = request
         with patch.object(youtube, "cfg", return_value={"youtube": {
-                 "privacy": "private", "category_id": "27", "synthetic_disclosure": False}}), \\
-             patch.object(youtube, "yt", return_value=service), \\
+                 "privacy": "private", "category_id": "27", "synthetic_disclosure": False}}), \
+             patch.object(youtube, "yt", return_value=service), \
              patch.object(youtube, "MediaFileUpload", return_value=object()):
             self.assertEqual("video-new", youtube.upload("video.mp4", "Title", "Description",
                                                           ["documentary"], idempotency_tag=tag))
