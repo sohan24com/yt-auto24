@@ -7,8 +7,9 @@ uploads media that fails the media probes.
 
 ## Setup (about 45 minutes, once)
 
-1. **Repo**: create a new **public** GitHub repo, upload all these files. (Public = unlimited free Actions minutes.
-   Never commit keys; they go in Secrets only.)
+1. **Repo**: keep the repository public or private according to your needs. GitHub Actions usage and included minutes
+   depend on the repository visibility and your account plan; check GitHub's current limits. Never commit keys;
+   keep them in Actions Secrets only.
 2. **Gemini keys**: add up to five API keys as GitHub Actions secrets: `GEMINI_API_KEY`,
    `GEMINI_API_KEY_2`, `GEMINI_API_KEY_3`, `GEMINI_API_KEY_4`, and `GEMINI_API_KEY_5`.
    The code tries configured keys across Gemini requests; Gemini TTS also moves to the next key after a failure.
@@ -18,8 +19,9 @@ uploads media that fails the media probes.
    `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` for Cloudflare Workers AI, and
    `OPENROUTER_API_KEY` for OpenRouter. Ordinary text/JSON generation tries Gemini, Groq, Cloudflare,
    then OpenRouter's `openrouter/free` router only; it never selects a paid OpenRouter model. The free
-   router is rate limited (currently 50 requests/day); provider availability can still vary. Grounded fact-check tries Gemini Search first, then Groq's required browser_search tool. If both are unavailable,
-   it keeps the original script and does not claim the check succeeded.
+   router and provider limits vary by account and can change. Grounded fact-check tries Gemini Search first,
+   then Groq's required browser_search tool. Publishing is held unless structured claim-to-source evidence
+   is returned for the documentary; an unverified original script is retained for diagnosis, not published.
    Groq keys in one organization share quota. Cloudflare also has a daily free allocation.
    Keep all credentials only in Actions secrets. Cohere trial keys are not used by this production workflow:
    Cohere says trial keys are not permitted for production or commercial use; a production key is paid.
@@ -47,26 +49,37 @@ Schedule: `generate.yml` runs 05:30 and 13:30 UTC (edit the cron), `analytics.ym
 
 ## Read this before expecting results
 
-- **Upload lock**: videos uploaded through a *new, unaudited* API project are forced to **Private**.
-  Submit Google's "YouTube API Services - Audit and Quota Extension" form. Until approved, publish manually
-  (the files stay on Drive for 3 days) or accept private uploads.
+- **Upload privacy**: current YouTube Data API documentation says unverified projects are no longer
+  automatically restricted to private uploads. The workflow still uses the explicit `youtube.privacy`
+  setting in `config.yaml`; account restrictions and API policy can still affect an upload.
+  See [YouTube API revision history](https://developers.google.com/youtube/data/revision_history).
 - **Thumbnails** need a phone-verified channel.
 - **Monetization risk**: fully automated, repetitive channels can be rejected/demonetized under YouTube's
   "inauthentic content" policy. Unique scripts, real analysis and sources help; they do not guarantee anything.
 - **Nobody can guarantee #1.** What the system does is the proven loop: strong hook, retention pacing,
   title/thumbnail testing, learning from analytics. Expect the first 2-4 weeks to have low views.
-- **Quotas**: 2 videos + 2 Shorts = ~6,400 of 10,000 daily API units.
-- **Fact-check** uses Gemini with Google Search grounding. It reduces errors, it does not eliminate them.
-  Review the first videos by hand, especially for the "mystery" category.
+- **YouTube API quota**: do not use the old `~6,400 / 10,000` estimate. Current docs describe separate
+  daily buckets, including up to 100 `videos.insert` calls/day and 10,000 units/day for other endpoints;
+  methods such as thumbnail writes and comment inserts consume those other units. Check the project's
+  Google Cloud quota page before changing upload volume:
+  [official quota calculator](https://developers.google.com/youtube/data/determine_quota_cost).
+- **Fact-check** uses Gemini Search and then Groq browser search. Claim links are evidence records, not
+  independent human verification; review documentary claims before publishing.
 - Voice fallback order is Gemini TTS → Edge TTS → offline `espeak-ng`. The last option is less natural, but it does not need a third-party TTS service or API key.
-- Footage results are matched to narration terms. Pexels/Pixabay are labeled illustrative; Wikimedia reference
-  images and Internet Archive clips carry source labels. When nothing relevant is available, the video shows a
-  generated context card instead of unrelated stock.
+- Footage is matched to narration terms. Each used asset is written to an asset manifest with its source ID,
+  source URL, license label, license URL, and review status. Wikimedia and Internet Archive licensing is
+  filtered to the allowed recorded licenses; NASA items without usable rights metadata are skipped.
+  Pexels/Pixabay are labeled illustrative and their provider terms are recorded. The manifest is stored with
+  the video record and uploaded to Drive.
 - Shorts select a curiosity moment before the final scene from across the documentary, use a 9:16 frame, and link
   to the full video in both description and a top-level comment. The YouTube Data API does not expose comment pinning.
 - Captions use animated word highlighting with estimated word timing; they are not forced-aligned to phonemes/audio.
-- Run offline checks with `python -m unittest discover -v`; the `documentary-quality` workflow runs these checks
-  and FFmpeg smoke tests on feature branches and pull requests. It never publishes videos.
+- Run offline checks with `python -m unittest discover -v`; the `documentary-quality` workflow runs unit tests,
+  FFmpeg full-file decode/audio scans, subtitle, thumbnail, and workflow YAML checks on feature branches and
+  pull requests. It never publishes videos.
+- Upload jobs save a manifest before YouTube insert and use a private metadata tag to find an upload after
+  an interrupted run. A saved pending job is resumed from the Drive copy; Shorts failures are retried on a
+  later run without re-uploading the long video.
 - Memory lives in `memory/` (committed to the repo). Drive holds only the 3-day video/thumbnail buffer.
 - CTR metric (`videoThumbnailImpressionsClickRate`) may be unavailable for some channels; the code then
   falls back to view counts.
