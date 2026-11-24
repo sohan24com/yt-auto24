@@ -192,12 +192,17 @@ GROQ_MODELS = (
     "qwen/qwen3.8-27b",
 )
 
+GROQ_GROUNDED_MODELS = (
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-120b",
+)
+
 
 class GroqUnavailableError(RuntimeError):
     """Raised after bounded attempts across configured Groq API keys and models."""
 
 
-def _groq(prompt, system=None, json_out=True, temperature=0.9,
+def _groq(prompt, system=None, json_out=True, temperature=0.9, grounding=False,
           request_timeout=20, total_timeout=90):
     keys = list(dict.fromkeys(k.strip() for k in (
         env("GROQ_API_KEY", False), env("GROQ_API_KEY_2", False),
@@ -215,7 +220,8 @@ def _groq(prompt, system=None, json_out=True, temperature=0.9,
     status_counts = {}
     last = "no usable response"
 
-    for model in GROQ_MODELS:
+    models = GROQ_GROUNDED_MODELS if grounding else GROQ_MODELS
+    for model in models:
         for key in keys:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -227,7 +233,10 @@ def _groq(prompt, system=None, json_out=True, temperature=0.9,
                 "temperature": temperature,
                 "max_completion_tokens": 4096,
             }
-            if json_out:
+            if grounding:
+                payload["tools"] = [{"type": "browser_search"}]
+                payload["tool_choice"] = "required"
+            elif json_out:
                 payload["response_format"] = {"type": "json_object"}
             try:
                 response = requests.post(
@@ -388,9 +397,21 @@ def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
             request_timeout=request_timeout, total_timeout=total_timeout,
         )
     except GeminiUnavailableError as gemini_error:
-        # Do not replace a Google Search grounded fact-check with an ungrounded answer.
         if grounding:
-            raise
+            # Groq browser_search supplies a real search step; do not substitute a
+            # plain text model and falsely label that result as grounded.
+            try:
+                print("Gemini Search unavailable; trying Groq browser-search fallback")
+                return _groq(
+                    prompt, system=system, json_out=json_out, temperature=temperature,
+                    grounding=True,
+                )
+            except GroqUnavailableError as groq_error:
+                if str(groq_error) == "No Groq API keys are configured":
+                    raise gemini_error
+                raise GeminiUnavailableError(
+                    f"{gemini_error}; Groq browser-search fallback failed: {groq_error}"
+                ) from groq_error
         errors = []
         providers = (
             ("Groq", _groq, GroqUnavailableError),
