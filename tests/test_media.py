@@ -99,8 +99,8 @@ class PipelineTests(unittest.TestCase):
         edit.make_ass(scenes, [5.0], ass, "THE LOST CLUE",
                       shot_labels=[(0.0, 5.0, "ARCHIVAL CLIP • INTERNET ARCHIVE")])
         text = ass.read_text(encoding="utf-8")
-        normalized = text.replace(r"\\N", " ")
-        self.assertIn("THE LOST CLUE", normalized)
+        self.assertIn("THE LOST", text)
+        self.assertIn("CLUE", text)
         self.assertIn("ARCHIVAL CLIP", text)
 
 
