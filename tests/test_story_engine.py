@@ -2,7 +2,7 @@ import json
 import unittest
 from pathlib import Path
 
-from src import story
+from src import edit, story
 
 
 SAMPLE_PATH = Path(__file__).resolve().parent.parent / "samples" / "antikythera_story_blueprint.json"
@@ -85,6 +85,41 @@ class StoryBlueprintTests(unittest.TestCase):
         self.assertEqual("CLAIM_001", attached["scenes"][0]["evidence_ids"][0])
         self.assertEqual("CLAIM_008", attached["scenes"][16]["evidence_ids"][0])
         self.assertEqual(8, len(attached["research_dossier"]))
+
+    def test_reveal_overlay_uses_scene_animation_and_transition_plan(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "captions.ass"
+            scenes = [
+                {"title": "Hook", "narration": "A machine predicted eclipses."},
+                {"title": "The limit", "narration": "The evidence is incomplete.",
+                 "information_reveal": "The full gear count remains uncertain.",
+                 "visual_plan": {"animation": "Animated text callout", "transition": "Flash cut"}},
+            ]
+            edit.make_ass(scenes, [4.0, 25.0], path)
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("THE FULL GEAR COUNT REMAINS UNCERTAIN", text)
+            self.assertIn(r"{\\fad(150,500)}", text)
+
+    def test_story_camera_pan_renders_with_ffmpeg(self):
+        import shutil
+        from PIL import Image
+        if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+            self.skipTest("FFmpeg and FFprobe required")
+        with tempfile.TemporaryDirectory() as td:
+            source = Path(td) / "source.png"
+            output = Path(td) / "pan.mp4"
+            Image.new("RGB", (640, 480), "teal").save(source)
+            edit.render_shot({"path": str(source), "kind": "image"}, 0.75, output, 2,
+                             camera_movement="pan left")
+            probe = subprocess.run([
+                "ffprobe", "-v", "error", "-show_entries",
+                "stream=codec_type,width,height,avg_frame_rate", "-of", "json", str(output),
+            ], check=True, capture_output=True, text=True)
+            video = next(stream for stream in json.loads(probe.stdout)["streams"]
+                         if stream.get("codec_type") == "video")
+            self.assertEqual((1920, 1080), (video["width"], video["height"]))
+            self.assertEqual("30/1", video["avg_frame_rate"])
 
     def test_fact_check_rewrite_keeps_scene_storyboard(self):
         blueprint = sample_blueprint()
