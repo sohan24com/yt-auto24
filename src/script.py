@@ -8,7 +8,7 @@ def words(scenes):
 def write_script(topic, validation_feedback=None):
     c = cfg()
     v = c["video"]
-    lessons = "\\n".join("- " + l for l in load_insights().get("lessons", []))
+    lessons = "\n".join("- " + l for l in load_insights().get("lessons", []))
     feedback = "\\n".join("- " + str(p) for p in (validation_feedback or [])) or "- none"
     prompt = f"""Write the narration for a documentary video of 8-10 minutes.
 Channel tone: {c['channel']['tone']}.
