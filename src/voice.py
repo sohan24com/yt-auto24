@@ -129,7 +129,11 @@ def _to_wav(src, wav):
 def build_voice(scenes, wd):
     """Returns (voice.wav, [scene durations incl. pause], engine name)."""
     wd = Path(wd)
-    keys = [k for k in (env("GEMINI_API_KEY", False), env("GEMINI_API_KEY_2", False), env("GEMINI_API_KEY_3", False)) if k]
+    keys = [k.strip() for k in (
+        env("GEMINI_API_KEY", False), env("GEMINI_API_KEY_2", False),
+        env("GEMINI_API_KEY_3", False), env("GEMINI_API_KEY_4", False),
+        env("GEMINI_API_KEY_5", False),
+    ) if k and k.strip()]
     engines = (["gemini"] if cfg()["video"].get("gemini_tts") and keys else []) + ["edge"]
     for engine in engines:
         try:
