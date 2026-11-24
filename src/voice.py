@@ -54,6 +54,19 @@ def _edge(text, out, emotion):
     raise RuntimeError("edge-tts failed")
 
 
+def _espeak(text, out, emotion=None):
+    """Offline, free last-resort narration using espeak-ng."""
+    cleaned = _clean(text)
+    if not cleaned:
+        raise RuntimeError("empty narration for espeak-ng")
+    subprocess.run(
+        ["espeak-ng", "-v", "en-us", "-s", "165", "-w", str(out), cleaned],
+        check=True, capture_output=True, text=True, timeout=120,
+    )
+    if not Path(out).exists() or Path(out).stat().st_size <= 1000:
+        raise RuntimeError("espeak-ng produced no usable audio")
+
+
 # ---------------- Gemini TTS ----------------
 def _find_audio(obj):
     """Longest base64 string stored under a 'data' key anywhere in the JSON response."""
@@ -134,7 +147,7 @@ def build_voice(scenes, wd):
         env("GEMINI_API_KEY_3", False), env("GEMINI_API_KEY_4", False),
         env("GEMINI_API_KEY_5", False),
     ) if k and k.strip()]
-    engines = (["gemini"] if cfg()["video"].get("gemini_tts") and keys else []) + ["edge"]
+    engines = (["gemini"] if cfg()["video"].get("gemini_tts") and keys else []) + ["edge", "espeak"]
     for engine in engines:
         try:
             wavs, durs = [], []
@@ -143,8 +156,10 @@ def build_voice(scenes, wd):
                 if engine == "gemini":
                     if not _gemini(s["narration"], src, s.get("emotion"), keys):
                         raise RuntimeError("gemini tts failed")
-                else:
+                elif engine == "edge":
                     _edge(s["narration"], src, s.get("emotion"))
+                else:
+                    _espeak(s["narration"], src, s.get("emotion"))
                 _to_wav(src, wav)
                 wavs.append(wav)
                 durs.append(probe(wav))
