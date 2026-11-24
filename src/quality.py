@@ -80,7 +80,7 @@ def validate_video(path, expected_duration=None, portrait=False, min_bytes=1 << 
     size = (1080, 1920) if portrait else (1920, 1080)
     if (width, height) != size:
         issues.append(f"wrong resolution: {width}x{height}")
-    if abs(fps - expected_fps) > 0.05:
+    if expected_fps is not None and abs(fps - expected_fps) > 0.05:
         issues.append(f"wrong frame rate: {fps:g} fps")
     if expected_duration is not None and abs(duration - expected_duration) > 1.5:
         issues.append(f"output duration {duration:.2f}s differs from expected {expected_duration:.2f}s")
@@ -114,7 +114,7 @@ def validate_video(path, expected_duration=None, portrait=False, min_bytes=1 << 
         start, freeze_duration = map(float, match.groups())
         if freeze_duration >= 8.0:
             issues.append(f"frozen section at {start:.1f}s ({freeze_duration:.1f}s)")
-    peaks = re.findall(r"Peak level dB:\\s*(-?[0-9.]+|inf)", log, flags=re.I)
+    peaks = re.findall(r"Peak level dB:\s*(-?[0-9.]+|inf)", log, flags=re.I)
     if any(value.lower() != "inf" and float(value) >= -0.05 for value in peaks):
         issues.append("audio peak is at or above -0.05 dBFS (clipping risk)")
     if not peaks:
