@@ -93,3 +93,8 @@ def retention_curve(vid, start, end):
         return [(row[0], row[1]) for row in r.get("rows", [])]
     except HttpError:
         return []
+
+
+def localize(vid, localizations):
+    """Add translated titles/descriptions; YouTube shows each viewer the one for their language."""
+    yt().videos().update(part="localizations", body={"id": vid, "localizations": localizations}).execute()

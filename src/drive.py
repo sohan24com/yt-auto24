@@ -2,7 +2,7 @@ import datetime as dt
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 from .common import cfg
-from .google_auth import creds
+from .google_auth import drive_creds as creds
 
 _svc = None
 

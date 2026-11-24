@@ -26,6 +26,7 @@ def gate(final, total, reuse):
 
 
 def build_once(wd):
+    F.reset()
     topic = T.choose_topic()
     print("TOPIC:", topic)
     script = None
@@ -36,27 +37,45 @@ def build_once(wd):
         print("script rejected:", S.valid(script))
     else:
         raise RuntimeError("could not produce a valid script")
-    script = S.fact_check(script)
+    checked = S.fact_check(script)
+    for k in ("setting", "wiki_terms", "hook_text"):            # fact-check output may drop these
+        checked[k] = script.get(k, checked.get(k))
+    for i, sc in enumerate(checked["scenes"]):                  # ...and per-scene emotion / visuals
+        if i < len(script["scenes"]):
+            sc.setdefault("emotion", script["scenes"][i].get("emotion"))
+            sc.setdefault("visuals", script["scenes"][i].get("visuals", []))
+    script = checked
     scenes = script["scenes"]
 
-    voice_wav, durs = V.build_voice(scenes, wd)
+    voice_wav, durs, engine = V.build_voice(scenes, wd)
     total = sum(durs)
-    print(f"voice {total:.0f}s")
+    print(f"voice {total:.0f}s ({engine})")
 
-    plans = [E.plan_shots(d) for d in durs]
+    plans = [E.plan_shots(d, fast=10.0 if i == 0 else 0.0) for i, d in enumerate(durs)]   # cold open = fast cuts
+    queries = S.shot_queries(topic, script, scenes, S.beats(scenes, durs, plans))
+    beats_ = S.beats(scenes, durs, plans)
+    wiki = F.wiki_pool(script.get("wiki_terms", []), wd)
+    n_shots = sum(len(p) for p in plans)
     used, assets = set(), []
-    for i, (s, p) in enumerate(zip(scenes, plans)):
-        assets.append(F.gather(i, s.get("visuals", []), len(p), used, wd))
+    for si in range(len(scenes)):
+        row = []
+        for bi in range(len(plans[si])):
+            q, alt = queries[si][bi]
+            row.append(F.gather_shot(q, alt, beats_[si][bi], script.get("setting", ""), used, wd, wiki,
+                                     total_shots=n_shots))
+        assets.append(row)
+        print(f"scene {si + 1}/{len(scenes)} footage ready", flush=True)
     all_assets = [a for sc in assets for a in sc]
     reuse = sum(a["reused"] for a in all_assets) / len(all_assets)
 
     final = Path(wd) / "final.mp4"
-    starts = E.assemble(scenes, durs, plans, assets, voice_wav, wd, final)
+    starts = E.assemble(scenes, durs, plans, assets, voice_wav, wd, final, hook_text=script.get("hook_text", ""))
     problems = gate(final, total, reuse)
     return topic, script, scenes, durs, starts, final, total, problems
 
 
 def main():
+    print("code version:", (Path(__file__).resolve().parent.parent / "VERSION.txt").read_text().strip())
     c = cfg()
     force = os.environ.get("FORCE") == "1"
     today = now().date()
@@ -84,7 +103,8 @@ def main():
         meta = S.make_metadata(topic, [(stamp(st), s) for st, s in zip(starts, scenes)],
                                script.get("sources", []), F.credit_line())
         frame = Path(wd) / "frame.jpg"
-        TH.grab_frame(final, max(total * 0.12, 3), frame)
+        shots = sorted(Path(wd).glob("shot*.mp4"))          # frame from a clean shot (no burned subtitles)
+        TH.grab_frame(shots[len(shots) // 8], 1.0, frame)
         thumbs = TH.make_thumbs(frame, meta["thumb_texts"], wd)
 
         drive_video = D.upload(final, f"{today}_{meta['title'][:40]}.mp4")
@@ -98,6 +118,18 @@ def main():
                "scenes": [{"title": s["title"], "start": round(st)} for st, s in zip(starts, scenes)],
                "fact_check_changes": script.get("changes", []), "swapped": False, "snapshots": {}}
         save_video(rec)
+
+        if c.get("localization", {}).get("enabled"):          # titles/descriptions in the viewer's language
+            try:
+                intro = meta["description"].split("\n\nCHAPTERS")[0]
+                tail = meta["description"][len(intro):]
+                tr = S.translate_meta(meta["title"], intro, c["localization"]["languages"])
+                Y.localize(vid, {k: {"title": v["title"][:100], "description": (v["description"] + tail)[:4900]}
+                                 for k, v in tr.items()})
+                rec["localized"] = sorted(tr)
+                save_video(rec)
+            except Exception as e:
+                print("localization failed (non-fatal):", e)
 
         if c["shorts"]["enabled"]:
             try:
