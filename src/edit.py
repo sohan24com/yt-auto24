@@ -262,15 +262,32 @@ def make_impact(out):
                             "aformat=channel_layouts=stereo[o]", "-map", "[o]", str(out)])
 
 
-def mix_audio(voice, music, whoosh, impact, starts, total, out):
+def mix_audio(voice, music, whoosh, impact, starts, total, out, scenes=None, scene_starts=None):
     """Voice at -16 LUFS, music bed ~14 LU under it (gentle ducking while talking), whooshes on scene cuts."""
     n = len(starts)
     f = ["[0:a]loudnorm=I=-16:TP=-1.5:LRA=7,aresample=44100,asplit=2[v1][v2]",
          f"[1:a]loudnorm=I=-30:TP=-3:LRA=7,aresample=44100,afade=t=in:d=3,afade=t=out:st={max(total - 4, 1):.2f}:d=4[m]",
          "[m][v1]sidechaincompress=threshold=0.05:ratio=2.5:attack=40:release=800[duck]"]
     labels = ["[duck]", "[v2]"]
-    f.append("[3:a]volume=0.8,adelay=50|50[imp]")
+    scenes = scenes or []
+    impact_requests = []
+    for index, scene in enumerate(scenes):
+        if index == 0:
+            continue  # opening already has the dedicated opening impact
+        plan = scene.get("visual_plan", {})
+        effect = str(plan.get("sound_effect", "")).lower() if isinstance(plan, dict) else ""
+        if any(word in effect for word in ("impact", "metal", "reveal hit", "stinger", "thunder", "boom", "crash")):
+            starts_for_scene = scene_starts or starts
+            if index < len(starts_for_scene):
+                impact_requests.append((index, float(starts_for_scene[index])))
+    impact_parts = ["[impact0]"] + [f"[impact{i + 1}]" for i in range(len(impact_requests))]
+    f.append(f"[3:a]asplit={len(impact_parts)}" + "".join(impact_parts))
+    f.append("[impact0]volume=0.8,adelay=50|50[imp]")
     labels.append("[imp]")
+    for part_index, (scene_index, start) in enumerate(impact_requests, 1):
+        delay = max(int(start * 1000), 0)
+        f.append(f"[impact{part_index}]volume=0.24,adelay={delay}|{delay}[sceneimpact{scene_index}]")
+        labels.append(f"[sceneimpact{scene_index}]")
     if n:
         f.append(f"[2:a]asplit={n}" + "".join(f"[w{i}]" for i in range(n)))
         for i, st in enumerate(starts):
@@ -322,7 +339,8 @@ def assemble(scenes, durs, plans, assets_by_scene, voice, wd, out, hook_text="")
     make_music(total, wd / "music.wav", wd, scenes=scenes, durs=durs)
     make_whoosh(wd / "whoosh.wav")
     make_impact(wd / "impact.wav")
-    mix_audio(voice, wd / "music.wav", wd / "whoosh.wav", wd / "impact.wav", starts[1:], total, wd / "mix.wav", scenes=scenes)
+    mix_audio(voice, wd / "music.wav", wd / "whoosh.wav", wd / "impact.wav",
+              starts[1:], total, wd / "mix.wav", scenes=scenes, scene_starts=starts)
     run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "shots.txt", "-i", "mix.wav",
          "-vf", "subtitles=subs.ass", "-map", "0:v", "-map", "1:a",      # no fade-in: the video starts on a hit
          "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p",
