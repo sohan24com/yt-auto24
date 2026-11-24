@@ -89,8 +89,11 @@ def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
         body["tools"] = [{"google_search": {}}]   # cannot be combined with JSON mime type
     elif json_out:
         body["generationConfig"]["responseMimeType"] = "application/json"
-    keys = [k for k in (env("GEMINI_API_KEY", False), env("GEMINI_API_KEY_2", False),
-                        env("GEMINI_API_KEY_3", False)) if k]
+    keys = [k.strip() for k in (
+        env("GEMINI_API_KEY", False), env("GEMINI_API_KEY_2", False),
+        env("GEMINI_API_KEY_3", False), env("GEMINI_API_KEY_4", False),
+        env("GEMINI_API_KEY_5", False),
+    ) if k and k.strip()]
     if not keys:
         raise RuntimeError("No GEMINI_API_KEY set")
     models = _model_list(keys[0])
