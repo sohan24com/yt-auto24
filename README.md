@@ -12,7 +12,10 @@ uploads media that fails the media probes.
    keep them in Actions Secrets only.
 2. **Gemini keys**: add up to five API keys as GitHub Actions secrets: `GEMINI_API_KEY`,
    `GEMINI_API_KEY_2`, `GEMINI_API_KEY_3`, `GEMINI_API_KEY_4`, and `GEMINI_API_KEY_5`.
-   The code tries configured keys across Gemini requests; Gemini TTS also moves to the next key after a failure.
+   Invalid-key errors may try another configured key. A Gemini 403 permission/free-tier error or 429 quota/rate-limit
+   error stops Gemini retries for the rest of that workflow run; ordinary generation then uses the configured
+   provider fallbacks. Do not add keys to work around an exhausted quota. Gemini TTS falls back to Edge TTS and
+   then offline `espeak-ng` when it cannot complete.
    Add keys from separate Google Cloud projects if you need separate project quotas; multiple keys in one
    project generally share that project's quota.
 3. **Optional text fallbacks**: add `GROQ_API_KEY` and `GROQ_API_KEY_2` for Groq,
@@ -36,7 +39,10 @@ uploads media that fails the media probes.
      `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_DRIVE_REFRESH_TOKEN` (run `get_tokens.py youtube`
      and `get_tokens.py drive`). The existing YouTube token keeps upload and analytics working. To enable the optional
      Shorts link comment, regenerate `GOOGLE_REFRESH_TOKEN` with `python get_tokens.py youtube` and update that
-     GitHub Actions secret. The new token is saved locally in an ignored file; the helper does not print its value.
+     GitHub Actions secret. Comments require the additional OAuth scope
+     `https://www.googleapis.com/auth/youtube.force-ssl`; the helper requests it for the YouTube token. The runtime
+     uses that extra scope only for comments, so an older token can continue uploads and analytics but cannot post
+     comments. The new token is saved locally in an ignored file; the helper does not print its value.
 6. **Optional** Telegram alerts: secrets `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 7. **Optional music**: add only tracks you have rights to use under `assets/music/`. Name tracks with a mood word
    such as `suspense_01.mp3`, `tension_01.mp3`, `emotional_01.mp3`, `wonder_01.mp3`, or `neutral_01.mp3`.
@@ -111,3 +117,4 @@ Schedule: `generate.yml` runs 05:30 and 13:30 UTC (edit the cron), `analytics.ym
 `config.yaml`: niche/tone, category mix, word counts, voice, privacy, Shorts, retention days, swap threshold.
 Run offline checks: `python -m unittest discover -v` (requires FFmpeg/ffprobe). To test generation manually,
 `FORCE=1 python -m src.pipeline` still needs API secrets and may upload a video.
+

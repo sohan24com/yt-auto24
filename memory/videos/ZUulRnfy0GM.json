@@ -68,5 +68,12 @@
  ],
  "fact_check_changes": [],
  "swapped": false,
- "snapshots": {}
+ "snapshots": {
+  "24h": {
+   "public_views": 3
+  }
+ },
+ "latest": {
+  "public_views": 3
+ }
 }
