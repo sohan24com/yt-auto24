@@ -77,5 +77,8 @@
   "pt",
   "ru"
  ],
- "short_scene": "The Vanishing Act"
+ "short_scene": "The Vanishing Act",
+ "latest": {
+  "public_views": 2
+ }
 }
