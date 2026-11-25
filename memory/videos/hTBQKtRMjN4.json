@@ -67,9 +67,19 @@
   }
  ],
  "fact_check_changes": [],
- "swapped": false,
- "snapshots": {},
+ "swapped": true,
+ "snapshots": {
+  "24h": {
+   "views": 2,
+   "averageViewPercentage": 13.350000000000001,
+   "averageViewDuration": 70,
+   "public_views": 2
+  }
+ },
  "latest": {
+  "views": 2,
+  "averageViewPercentage": 13.350000000000001,
+  "averageViewDuration": 70,
   "public_views": 2
  }
 }

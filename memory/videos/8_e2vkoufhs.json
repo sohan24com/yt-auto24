@@ -1,0 +1,85 @@
+{
+ "video_id": "8_e2vkoufhs",
+ "url": "https://youtu.be/8_e2vkoufhs",
+ "created": "2026-11-25T15:06:23.766972+00:00",
+ "day": 3,
+ "topic": "Tabby's Star and the Mystery of the Dimming Sun",
+ "angle": "Why did a star 1,470 light-years away dim erratically by up to 22%, forcing astrophysicists to test everything from Dyson swarms to disintegrating exocomets?",
+ "category": "science",
+ "title": "Why Did Tabby's Star Dim by 22%?",
+ "title_b": "Tabby's Star: Dyson Swarm or Dust Cloud?",
+ "thumb_ids": [
+  "1mzf6uQkgGmKDtY-tSksjBfiBPEEEEB8X",
+  "1hUwFunmIWqDK-7Lj6va1MwQ04vPStSQt",
+  "1h-VGkovmy7VT2bpC78it6hnU-pi04yh_"
+ ],
+ "drive_video_id": "1cMCtDXP_sZlkLBVh60sjhEt0i-4BiEsw",
+ "duration": 590,
+ "short_id": "gO4Ic403P3M",
+ "scenes": [
+  {
+   "title": "The First Anomaly",
+   "start": 0
+  },
+  {
+   "title": "The Silent Watcher",
+   "start": 48
+  },
+  {
+   "title": "The Irregular Shadow",
+   "start": 104
+  },
+  {
+   "title": "Ruling Out the Obvious",
+   "start": 158
+  },
+  {
+   "title": "The Megastructure Hypothesis",
+   "start": 218
+  },
+  {
+   "title": "Listening to Cygnus",
+   "start": 265
+  },
+  {
+   "title": "The Color of Light",
+   "start": 314
+  },
+  {
+   "title": "The Microscopic Shimmer",
+   "start": 363
+  },
+  {
+   "title": "The Disintegrating Comets",
+   "start": 412
+  },
+  {
+   "title": "Century of Shadows",
+   "start": 459
+  },
+  {
+   "title": "The Melting Moon Theory",
+   "start": 487
+  },
+  {
+   "title": "The Unsolved Frontier",
+   "start": 539
+  }
+ ],
+ "fact_check_changes": [],
+ "swapped": false,
+ "snapshots": {},
+ "localized": [
+  "ar",
+  "bn",
+  "de",
+  "es",
+  "fr",
+  "hi",
+  "id",
+  "ja",
+  "pt",
+  "ru"
+ ],
+ "short_scene": "Century of Shadows"
+}
