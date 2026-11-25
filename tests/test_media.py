@@ -116,7 +116,6 @@ class PipelineTests(unittest.TestCase):
             patch("src.common._model_list", return_value=["gemini-model"]),
             patch("src.common.requests.post", side_effect=[
                 self._gemini_response(429, text="quota"),
-                self._gemini_response(429, text="quota"),
                 groq_quota, groq_success,
             ]) as post,
         ):
@@ -174,7 +173,7 @@ class PipelineTests(unittest.TestCase):
                 common.gemini("test prompt", request_timeout=1, total_timeout=5)
         self.assertEqual(1, post.call_count)
         self.assertIn("HTTP 403 x1", str(error.exception))
-        self.assertIn("paused for this run", str(error.exception))
+        self.assertIn("project permission or free-tier access", str(error.exception))
 
     def test_footage_candidate_match_metadata_uses_candidate_text(self):
         footage.reset()
