@@ -81,5 +81,8 @@
   "pt",
   "ru"
  ],
- "short_scene": "Century of Shadows"
+ "short_scene": "Century of Shadows",
+ "latest": {
+  "public_views": 4
+ }
 }

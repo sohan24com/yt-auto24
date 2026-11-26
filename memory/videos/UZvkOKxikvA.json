@@ -68,7 +68,11 @@
  ],
  "fact_check_changes": [],
  "swapped": false,
- "snapshots": {},
+ "snapshots": {
+  "24h": {
+   "public_views": 23
+  }
+ },
  "localized": [
   "ar",
   "bn",
@@ -83,6 +87,6 @@
  ],
  "short_scene": "The Unbroken Code",
  "latest": {
-  "public_views": 12
+  "public_views": 23
  }
 }

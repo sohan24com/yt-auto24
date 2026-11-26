@@ -74,6 +74,9 @@
   }
  },
  "latest": {
+  "views": 0,
+  "averageViewPercentage": 0,
+  "averageViewDuration": 0,
   "public_views": 1
  }
 }
