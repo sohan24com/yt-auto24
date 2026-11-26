@@ -71,6 +71,12 @@
  "snapshots": {
   "24h": {
    "public_views": 1
+  },
+  "72h": {
+   "views": 0,
+   "averageViewPercentage": 0,
+   "averageViewDuration": 0,
+   "public_views": 1
   }
  },
  "latest": {
