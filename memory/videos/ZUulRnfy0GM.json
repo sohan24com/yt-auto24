@@ -71,12 +71,18 @@
  "snapshots": {
   "24h": {
    "public_views": 3
+  },
+  "72h": {
+   "views": 3,
+   "averageViewPercentage": 6.12,
+   "averageViewDuration": 38,
+   "public_views": 3
   }
  },
  "latest": {
-  "views": 2,
-  "averageViewPercentage": 6.819999999999999,
-  "averageViewDuration": 43,
+  "views": 3,
+  "averageViewPercentage": 6.12,
+  "averageViewDuration": 38,
   "public_views": 3
  }
 }
