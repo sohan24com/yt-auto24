@@ -5,7 +5,7 @@ def words(scenes):
     return sum(len(s["narration"].split()) for s in scenes)
 
 
-def write_script(topic, validation_feedback=None):
+def write_script(topic, validation_feedback=None, previous_draft=None):
     c = cfg()
     v = c["video"]
     lessons = "\n".join("- " + l for l in load_insights().get("lessons", []))
@@ -22,6 +22,7 @@ STORY CONTRACT
 - Scene 1 is a standalone cold-open hook: one truthful sentence, at most 12 words, no greeting, no channel intro.
   It must open a specific question answered later. It is the entire hook scene, not a paragraph that runs past five seconds.
 - The central_question, title_promise and opening narration must describe the same documented story.
+  Add hook_text: a truthful 3-5 word on-screen phrase drawn from the spoken opening.
 - Act I establishes the object, stakes and investigation; Act II develops evidence and complications; Act III delivers the evidence-bounded answer, meaning and concise natural CTA.
 - Create 1-3 open loops, each with a unique ID, opening scene, question and a later explicit payoff scene before scene 18.
 - Every scene must move the story forward with new information, a reveal, an obstacle, a consequence or a payoff.
@@ -49,7 +50,7 @@ music_mood and transition.
 Clearly mark archival evidence vs illustrative/reconstructed imagery in visual descriptions. No unrelated visuals.
 
 Return ONLY JSON:
-{{"central_question":"","title_promise":"","acts":[{{"name":"Act I — ...","scene_numbers":[1,2,3,4,5],"dramatic_question":""}},{{"name":"Act II — ...","scene_numbers":[6,7,8,9,10,11,12,13,14],"dramatic_question":""}},{{"name":"Act III — ...","scene_numbers":[15,16,17,18],"dramatic_question":""}}],
+{{"central_question":"","title_promise":"","hook_text":"","acts":[{{"name":"Act I — ...","scene_numbers":[1,2,3,4,5],"dramatic_question":""}},{{"name":"Act II — ...","scene_numbers":[6,7,8,9,10,11,12,13,14],"dramatic_question":""}},{{"name":"Act III — ...","scene_numbers":[15,16,17,18],"dramatic_question":""}}],
 "open_loops":[{{"id":"L1","question":"","opened_scene":1,"payoff_scene":8}}],
 "scenes":[{{"number":1,"act":1,"title":"","narration":"","story_purpose":"","story_progress":"","causal_link":"","visual_anchor":"","emotion":"","opens_loop":["L1"],"pays_off":[],"pattern_interrupt":"","information_reveal":"","target_duration_seconds":4,"evidence_ids":[],"visuals":["","","",""],"visual_plan":{{"description":"","camera_movement":"","footage_keywords":["",""],"animation":"","sound_effect":"","music_mood":"","transition":""}}}}]}}
 VALIDATION FEEDBACK FROM THE PREVIOUS DRAFT (correct each item):
@@ -57,8 +58,18 @@ VALIDATION FEEDBACK FROM THE PREVIOUS DRAFT (correct each item):
 If feedback reports a word count, revise the narration materially to fit the hard limit; do not merely acknowledge it.
 Lessons from channel analytics (apply only when consistent with evidence):
 {lessons or '- none yet'}"""
+    if isinstance(previous_draft, dict):
+        import json
+        prompt += ("\n\nREPAIR THIS PREVIOUS DRAFT. Keep its researched subject, evidence boundaries, and useful story structure. "
+                   "Fix EVERY validation item; do not invent facts. Return the complete JSON.\nPREVIOUS DRAFT:\n" +
+                   json.dumps(previous_draft, ensure_ascii=False))
     result = gemini(prompt, temperature=0.75)
     if isinstance(result, dict):
+        from .story import align_visual_anchors, reconcile_loop_references
+        result = align_visual_anchors(result)
+        result = reconcile_loop_references(result)
+        if not 3 <= len(str(result.get("hook_text", "")).split()) <= 5 and result.get("scenes"):
+            result["hook_text"] = _hook_text(result["scenes"][0].get("narration", ""))
         result["story_schema_version"] = 1
         from .story import quality_score
         result["story_quality"] = quality_score(result, require_evidence=False)
@@ -117,7 +128,11 @@ def valid(script):
             problems.append("5-second hook too long (max 12 words in opening sentence)")
     hook = str(script.get("hook_text", "")).split()
     if not 3 <= len(hook) <= 5:
-        problems.append("hook_text must contain 3-5 words")
+        derived_hook = _hook_text(sc[0].get("narration", "")) if sc else ""
+        if derived_hook:
+            script["hook_text"] = derived_hook
+        else:
+            problems.append("hook_text must contain 3-5 words")
     if not sc or len(sc[-1].get("narration", "").split()) < 20:
         problems.append("missing documentary outro/payoff")
     if script.get("story_schema_version") == 1:
@@ -129,6 +144,17 @@ def valid(script):
             problems.append(f"story quality score {story_result['score']} is below {minimum}")
         script["story_quality"] = story_result
     return list(dict.fromkeys(problems))
+
+
+def _hook_text(narration):
+    """Build the visible hook from words already spoken in the opening scene."""
+    import re
+    stop = {"a", "an", "the", "and", "for", "from", "with", "what", "when", "where", "why", "how",
+            "was", "were", "that", "this", "into", "over", "after", "before", "did", "does"}
+    tokens = re.findall(r"[A-Za-z0-9'-]+", str(narration))
+    meaningful = [word for word in tokens if word.lower() not in stop]
+    chosen = meaningful[:5] if len(meaningful) >= 3 else tokens[:5]
+    return " ".join(chosen).upper() if len(chosen) >= 3 else ""
 
 
 def _fallback_terms(text, limit=4):

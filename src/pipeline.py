@@ -111,12 +111,16 @@ def build_once(wd, validation_feedback=None):
             state.pop("voice", None)
             for artifact in ("voice.wav", "final.mp4", "audio_report.json", "subs.ass"):
                 (wd / artifact).unlink(missing_ok=True)
-        for attempt in range(1, 4):
-            script = S.write_script(topic, validation_feedback=problems)
+        previous_draft = None
+        max_attempts = 5
+        for attempt in range(1, max_attempts + 1):
+            script = S.write_script(topic, validation_feedback=problems,
+                                    previous_draft=previous_draft)
             problems = S.valid(script)
             if not problems:
                 break
-            print(f"script rejected (draft {attempt}/3):", problems)
+            print(f"script rejected (draft {attempt}/{max_attempts}):", problems)
+            previous_draft = script if isinstance(script, dict) else None
             limits = cfg()["video"]
             if any(str(issue).startswith("word count ") for issue in problems):
                 problems.append(
@@ -127,6 +131,8 @@ def build_once(wd, validation_feedback=None):
             raise RuntimeError(f"could not produce a valid script: {problems}")
         checked = S.fact_check(script)
         checked = STORY.preserve_planning(script, checked)
+        checked = STORY.align_visual_anchors(checked)
+        checked = STORY.reconcile_loop_references(checked)
         for k in ("setting", "wiki_terms", "hook_text"):
             checked[k] = script.get(k, checked.get(k))
         checked = STORY.attach_evidence(checked, checked.get("_fact_check", {}))
