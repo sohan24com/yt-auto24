@@ -3,8 +3,9 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from src import edit, story
+from src import edit, script, story
 
 
 SAMPLE_PATH = Path(__file__).resolve().parent.parent / "samples" / "antikythera_story_blueprint.json"
@@ -57,6 +58,40 @@ class StoryBlueprintTests(unittest.TestCase):
         issues = story.validate_blueprint(blueprint)
         self.assertTrue(any("cause/effect" in issue for issue in issues))
         self.assertTrue(any("visual anchor" in issue for issue in issues))
+
+    def test_visual_anchor_repair_reuses_narration_and_existing_visual_search_phrase(self):
+        blueprint = {"scenes": [{
+            "narration": "Researchers found bronze gears beneath the shipwreck.",
+            "visual_anchor": "ancient temple",
+            "visuals": ["bronze gears shipwreck", "underwater divers"],
+            "visual_plan": {"description": "Underwater archaeological survey", "footage_keywords": ["divers"]},
+        }]}
+        repaired = story.align_visual_anchors(blueprint)
+        scene = repaired["scenes"][0]
+        self.assertIn(scene["visual_anchor"], {"bronze gears", "bronze gears shipwreck", "gears shipwreck"})
+        self.assertIn("bronze gears shipwreck", scene["visual_plan"]["description"])
+        self.assertTrue(scene["visual_anchor"] in " ".join([
+            scene["narration"], scene["visual_plan"]["description"],
+            *scene["visual_plan"]["footage_keywords"]]))
+
+
+    def test_prompt_requests_hook_text_and_enforceable_scene_word_budget(self):
+        with patch("src.script.cfg", return_value={
+                "video": {"words_min": 1150, "words_max": 1400},
+                "channel": {"tone": "curious"}}), \
+             patch("src.script.load_insights", return_value={"lessons": []}), \
+             patch("src.script.gemini", return_value={}) as call:
+            script.write_script({"topic": "Test topic", "angle": "A real question"})
+        prompt = call.call_args.args[0]
+        self.assertIn('"hook_text":""', prompt)
+        self.assertIn("at least 1150 narration words; hard maximum 1400", prompt)
+        self.assertIn("visual_anchor must be 1-3 concrete words", prompt)
+
+    def test_missing_hook_graphic_is_derived_from_the_spoken_opening(self):
+        draft = {"scenes": [{"narration": "A hidden bronze gear changed ancient history."}] * 10}
+        with patch("src.script.cfg", return_value={"video": {"words_min": 10, "words_max": 300}}):
+            script.valid(draft)
+        self.assertEqual("HIDDEN BRONZE GEAR CHANGED ANCIENT", draft["hook_text"])
 
     def test_repeated_narration_is_flagged(self):
         blueprint = sample_blueprint()

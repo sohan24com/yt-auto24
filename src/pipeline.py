@@ -111,17 +111,25 @@ def build_once(wd, validation_feedback=None):
             state.pop("voice", None)
             for artifact in ("voice.wav", "final.mp4", "audio_report.json", "subs.ass"):
                 (wd / artifact).unlink(missing_ok=True)
-        for attempt in range(1, 4):
-            script = S.write_script(topic, validation_feedback=problems)
+        previous_draft = None
+        max_attempts = 5
+        for attempt in range(1, max_attempts + 1):
+            script = S.write_script(topic, validation_feedback=problems,
+                                    previous_draft=previous_draft)
             problems = S.valid(script)
             if not problems:
                 break
-            print(f"script rejected (draft {attempt}/3):", problems)
+            print(f"script rejected (draft {attempt}/{max_attempts}):", problems)
+            previous_draft = script if isinstance(script, dict) else None
             limits = cfg()["video"]
             if any(str(issue).startswith("word count ") for issue in problems):
                 problems.append(
-                    f"Narration budget: target {(int(limits['words_min']) + int(limits['words_max'])) // 2} words; "
-                    f"hard maximum {limits['words_max']}. Compress repeated exposition across all scenes."
+                    f"Narration budget: hard minimum {limits['words_min']} words; target "
+                    f"{(int(limits['words_min']) + int(limits['words_max'])) // 2} words; hard maximum "
+                    f"{limits['words_max']}. Scenes 2-17 should each be about "
+                    f"{max(8, round((int(limits['words_min']) - 42) / 16))}-"
+                    f"{max(8, round((int(limits['words_max']) - 26) / 16))} words. Add supported context; "
+                    "do not pad, repeat, or omit evidence and payoffs."
                 )
         else:
             raise RuntimeError(f"could not produce a valid script: {problems}")

@@ -173,6 +173,8 @@ class CheckpointAndSafetyTests(unittest.TestCase):
         feedback = write_script.call_args_list[1].kwargs["validation_feedback"]
         self.assertTrue(any("target 1275 words" in issue and "hard maximum 1400" in issue
                             for issue in feedback))
+        self.assertEqual({}, write_script.call_args_list[1].kwargs["previous_draft"])
+        self.assertEqual(5, write_script.call_count)
 
     def test_identical_provider_download_is_not_counted_as_distinct_footage(self):
         footage.reset()

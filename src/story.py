@@ -43,6 +43,70 @@ def _scene_map(blueprint):
     return result
 
 
+def align_visual_anchors(blueprint):
+    """Align anchors to words shared by narration and the draft's own visual options.
+
+    This only reuses visual phrases already supplied in the scene plan; it does not
+    invent documentary evidence or introduce unrelated footage.
+    """
+    if not isinstance(blueprint, dict) or not isinstance(blueprint.get("scenes"), list):
+        return blueprint
+    result = dict(blueprint)
+    scenes = []
+    for original in blueprint["scenes"]:
+        if not isinstance(original, dict):
+            scenes.append(original)
+            continue
+        scene = dict(original)
+        raw_plan = scene.get("visual_plan")
+        plan = dict(raw_plan) if isinstance(raw_plan, dict) else {}
+        raw_keywords = plan.get("footage_keywords", [])
+        existing_keywords = raw_keywords if isinstance(raw_keywords, list) else []
+        narration = str(scene.get("narration", ""))
+        narration_order = [word.lower() for word in re.findall(r"[A-Za-z0-9']+", narration)
+                           if len(word) > 2 and word.lower() not in STOP]
+        narration_terms = set(narration_order)
+        visual_text = " ".join((str(plan.get("description", "")),
+                                " ".join(str(value) for value in existing_keywords
+                                         if isinstance(value, str))))
+        shared = narration_terms & _tokens(visual_text)
+
+        # Generated stock-search phrases are part of the draft's visual plan too.
+        # Use the closest existing phrase if the prose description missed the anchor.
+        if not shared:
+            options = scene.get("visuals", [])
+            if isinstance(options, list):
+                scored = []
+                for phrase in options:
+                    phrase_terms = narration_terms & _tokens(phrase)
+                    if phrase_terms:
+                        scored.append((len(phrase_terms), str(phrase), phrase_terms))
+                if scored:
+                    _, phrase, shared = max(scored, key=lambda row: (row[0], row[1]))
+                    description = str(plan.get("description", "")).strip()
+                    if phrase.lower() not in description.lower():
+                        plan["description"] = (description + " | visual target: " + phrase).strip(" |")
+                    keywords = list(existing_keywords)
+                    for word in re.findall(r"[A-Za-z0-9'-]+", phrase):
+                        if word.lower() in shared and word not in keywords:
+                            keywords.append(word)
+                    plan["footage_keywords"] = keywords[:8]
+
+        current_anchor = _tokens(scene.get("visual_anchor", ""))
+        if shared and (not current_anchor or not current_anchor <= shared):
+            chosen = []
+            for word in narration_order:
+                if word in shared and word not in chosen:
+                    chosen.append(word)
+                if len(chosen) == 3:
+                    break
+            scene["visual_anchor"] = " ".join(chosen)
+        scene["visual_plan"] = plan
+        scenes.append(scene)
+    result["scenes"] = scenes
+    return result
+
+
 def evidence_dossier(record):
     """Convert Phase 2 evidence rows to stable IDs consumable by scene plans."""
     rows = record.get("claims", []) if isinstance(record, dict) else []

@@ -202,8 +202,8 @@ class PipelineTests(unittest.TestCase):
                                 validation_feedback=["5-second hook too long"])
         prompt = gemini_call.call_args.args[0]
         self.assertIn("5-second hook too long", prompt)
-        self.assertIn("target 200 words total", prompt)
-        self.assertIn("never exceed 300 words", prompt)
+        self.assertIn("aim for 200", prompt)
+        self.assertIn("hard maximum 300", prompt)
         self.assertIn("Scene 1 must be one standalone sentence of 6-12 words", prompt)
 
     def test_ffprobe_missing_stream_durations_fall_back_to_container(self):
