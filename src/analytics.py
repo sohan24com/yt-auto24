@@ -27,6 +27,16 @@ def score(r):
     return r.get("views", 0) * (0.5 + r.get("averageViewPercentage", 0) / 100)
 
 
+def next_thumbnail_option(rec):
+    """Return the next exported concept, preserving compatibility with old records."""
+    options = rec.get("thumbnail_options") or []
+    if options:
+        active = rec.get("active_thumbnail_drive_id") or options[0].get("drive_id")
+        return next((row for row in options if row.get("drive_id") and row.get("drive_id") != active), None)
+    ids = rec.get("thumb_ids") or []
+    return {"drive_id": ids[1], "concept": "বিকল্প thumbnail", "score": None} if len(ids) > 1 else None
+
+
 def main():
     c = cfg()["optimize"]
     videos = [v for v in load_videos() if v.get("video_id")]
@@ -49,16 +59,26 @@ def main():
         if ctr is not None and ctr > 1:   # API may return percent instead of ratio
             ctr = ctr / 100
         weak = (ctr is not None and ctr < c["ctr_threshold"]) or (ctr is None and rep["public_views"] < 30)
-        if a >= c["thumb_swap_after_hours"] and weak and not rec["swapped"] and len(rec["thumb_ids"]) > 1:
+        option = next_thumbnail_option(rec)
+        if a >= c["thumb_swap_after_hours"] and weak and not rec.get("swapped", False) and option:
             try:
                 with tempfile.TemporaryDirectory() as td:
                     p = Path(td) / "alt.jpg"
-                    D.download(rec["thumb_ids"][1], p)
-                    Y.set_thumbnail(rec["video_id"], p)
-                if rec.get("title_b") and rec["title_b"] != rec["title"]:
-                    Y.update_title(rec["video_id"], rec["title_b"])
+                    D.download(option["drive_id"], p)
+                    if Y.set_thumbnail(rec["video_id"], p) is False:
+                        raise RuntimeError("YouTube did not accept the alternate thumbnail")
+                rec["active_thumbnail_drive_id"] = option["drive_id"]
+                rec["active_thumbnail_candidate_id"] = option.get("candidate_id")
+                rec["active_thumbnail_concept"] = option.get("concept")
+                rec["active_thumbnail_heuristic_score"] = option.get("score")
                 rec["swapped"] = True
-                notify(f"Swapped thumbnail/title for {rec['video_id']} (CTR {ctr})")
+                if rec.get("title_b") and rec["title_b"] != rec["title"]:
+                    try:
+                        Y.update_title(rec["video_id"], rec["title_b"])
+                    except Exception as e:
+                        print("title swap failed after thumbnail update:", e)
+                notify(f"Swapped thumbnail/title for {rec['video_id']} (CTR {ctr}; "
+                       f"concept {option.get('concept')}, design score {option.get('score')})")
             except Exception as e:
                 print("swap failed:", e)
         if "7d" in rec["snapshots"] and "drop" not in rec:

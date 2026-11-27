@@ -10,62 +10,92 @@ def write_script(topic, validation_feedback=None):
     v = c["video"]
     lessons = "\n".join("- " + l for l in load_insights().get("lessons", []))
     feedback = "\n".join("- " + str(p) for p in (validation_feedback or [])) or "- none"
-    prompt = f"""Write the narration for a documentary video of 8-10 minutes.
+    target_total = (int(v["words_min"]) + int(v["words_max"])) // 2
+    progression_budget = max(8, round((target_total - 38) / 16))
+    prompt = f"""Write a rigorous 8-10 minute English documentary narration using one evidence-led story blueprint.
 Channel tone: {c['channel']['tone']}.
 Topic: {topic['topic']}
 Angle: {topic['angle']}
 
-STRUCTURE
-- Scene 1 starts immediately with a truthful, source-checkable hook that can be spoken in 5 seconds (max 12 words).
-  The FIRST sentence must use a concrete, story-specific fact or question; no invented numbers, greetings, welcome,
-  channel introduction, or throat-clearing. Leave a real unresolved question for the story to answer.
-  Give "hook_text": 3-5 short ALL-CAPS words that accurately summarize this hook.
-- Follow with 10-12 scenes that build a clear cause-and-effect story; use an open loop only when the next scene answers it.
-- Final scene delivers the researched payoff, then a natural outro thanking viewers, inviting Like/Comment/Subscribe,
-  and pointing to the next related documentary without inventing a specific video title or link.
-DELIVERY
-- For every scene give "emotion": a short voice-acting direction that matches what happens in it, e.g.
-  "hushed, suspenseful", "somber, slow", "awed, rising", "urgent, tense", "calm, matter-of-fact", "warm, reflective".
-  Vary it across the video; mysterious moments are hushed, tragedies are somber, discoveries are awed.
-STYLE
-- Concrete details (dates, places, numbers), short sentences mixed with long ones, plain words.
-- Banned cliches: "in a world", "little did they know", "buckle up", "let's dive in".
-- Total narration {v['words_min']}-{v['words_max']} words. Spoken text only (no stage directions, no markdown).
+STORY CONTRACT
+- Create exactly 18 numbered scenes in exactly three acts: Act I scenes 1-5; Act II scenes 6-14; Act III scenes 15-18.
+- Scene 1 is a standalone cold-open hook: one truthful sentence, at most 12 words, no greeting, no channel intro.
+  It must open a specific question answered later. It is the entire hook scene, not a paragraph that runs past five seconds.
+- The central_question, title_promise and opening narration must describe the same documented story.
+- Act I establishes the object, stakes and investigation; Act II develops evidence and complications; Act III delivers the evidence-bounded answer, meaning and concise natural CTA.
+- Create 1-3 open loops, each with a unique ID, opening scene, question and a later explicit payoff scene before scene 18.
+- Every scene must move the story forward with new information, a reveal, an obstacle, a consequence or a payoff.
+- Plan 20-45 seconds of spoken progression for scenes 2-18. Put a target_duration_seconds estimate in each plan; actual audio timing is checked after voice generation.
+- Use a pattern interrupt only when it clarifies or changes the viewer's understanding; do not add empty spectacle.
+- Deliver a satisfying resolution in scene 17, then a brief thank-you/Like/Comment/Subscribe/related-next-video invitation in scene 18.
+- NARRATION LENGTH IS A HARD CONSTRAINT: target {target_total} words total; never exceed {v['words_max']} words.
+  Scene 1 must be one standalone sentence of 6-12 words. Scene 18 should be a concise 20-30 word outro.
+  Scenes 2-17 should average about {progression_budget} words each. Cut repetition and decorative filler before
+  removing evidence, causality, uncertainty, or story payoffs. Count narration only, not the storyboard fields.
+
+EVIDENCE AND HONESTY
+- Facts must be checkable and linked to research; distinguish observed evidence, published interpretation, hypothesis and unknown.
+- Never invent names, quotations, dates, numbers, source links, or certainty. Qualify unresolved disputes.
+- Use a truthful, surprising reveal supported by evidence, not a fabricated twist.
+- The later claim-to-source checker attaches source IDs; leave each scene's evidence_ids as [] in this draft.
+- Do not restate the same fact in multiple scenes unless the later repetition adds a consequence or payoff.
+
+SCENE-BY-SCENE STORYBOARD
+For every scene return: number, act (1/2/3), title, narration, story_purpose, story_progress, causal_link, visual_anchor, emotion,
+opens_loop (list of IDs), pays_off (list of IDs), pattern_interrupt, information_reveal,
+target_duration_seconds, evidence_ids, visuals (4 stock search phrases) and visual_plan with:
+description, camera_movement, footage_keywords (at least 2 concrete terms), animation, sound_effect,
+music_mood and transition.
+Clearly mark archival evidence vs illustrative/reconstructed imagery in visual descriptions. No unrelated visuals.
+
+Return ONLY JSON:
+{{"central_question":"","title_promise":"","acts":[{{"name":"Act I — ...","scene_numbers":[1,2,3,4,5],"dramatic_question":""}},{{"name":"Act II — ...","scene_numbers":[6,7,8,9,10,11,12,13,14],"dramatic_question":""}},{{"name":"Act III — ...","scene_numbers":[15,16,17,18],"dramatic_question":""}}],
+"open_loops":[{{"id":"L1","question":"","opened_scene":1,"payoff_scene":8}}],
+"scenes":[{{"number":1,"act":1,"title":"","narration":"","story_purpose":"","story_progress":"","causal_link":"","visual_anchor":"","emotion":"","opens_loop":["L1"],"pays_off":[],"pattern_interrupt":"","information_reveal":"","target_duration_seconds":4,"evidence_ids":[],"visuals":["","","",""],"visual_plan":{{"description":"","camera_movement":"","footage_keywords":["",""],"animation":"","sound_effect":"","music_mood":"","transition":""}}}}]}}
 VALIDATION FEEDBACK FROM THE PREVIOUS DRAFT (correct each item):
 {feedback}
-HONESTY
-- Separate documented facts from theories ("historians believe", "according to ...").
-- Never invent quotes, statistics, names or sources.
-VISUALS
-- For each scene give 4 stock-footage search queries: concrete visual nouns, 2-4 words, generic enough to
-  exist on Pexels (e.g. "ancient stone ruins", "foggy forest drone", "old handwritten manuscript"). No people's names.
-- Match the REAL place and era of the story: put the region in the query (e.g. "Scotland stormy sea", "Atlantic lighthouse
-  storm"). Prefer moody, overcast, dark footage. Avoid sunny tropical or Mediterranean-looking shots unless the story is set there.
-Lessons from our analytics (apply them):
-{lessons or '- none yet'}
-Return JSON: {{"setting":"place + era keywords for stock searches, e.g. 'Scotland island lighthouse 1900 storm'",
-"wiki_terms":["3-5 specific real places/objects/events that have photos on Wikimedia Commons, e.g. 'Flannan Isles Lighthouse'"],
-"hook_text":"WHERE ARE THEY?",
-"scenes":[{{"title":"short chapter title","emotion":"hushed, suspenseful","narration":"","visuals":["","","",""]}}],"sources":["real reference works/institutions"]}}"""
-    return gemini(prompt, temperature=0.85)
-
+If feedback reports a word count, revise the narration materially to fit the hard limit; do not merely acknowledge it.
+Lessons from channel analytics (apply only when consistent with evidence):
+{lessons or '- none yet'}"""
+    result = gemini(prompt, temperature=0.75)
+    if isinstance(result, dict):
+        result["story_schema_version"] = 1
+        from .story import quality_score
+        result["story_quality"] = quality_score(result, require_evidence=False)
+    return result
 
 def fact_check(script):
-    prompt = f"""You are a strict documentary fact-checker. Use Google Search to verify every factual claim
-(dates, names, numbers, causes) in this script. Fix errors. Remove or hedge anything you cannot verify.
-Keep the same structure, tone and length (within 10%). Keep every scene's "visuals" unchanged.
-Return ONLY JSON: {{"scenes":[...same format...],"sources":["urls or publication names actually used"],"changes":["what you changed"]}}
+    from .evidence import evidence_record, normalize_evidence
+
+    prompt = f"""You are a strict documentary fact-checker. Use the available live web-search tool.
+For every material factual claim, provide a claim-to-source record: scene number (1-based), exact claim,
+a concise supporting explanation grounded in the search result, source name, direct HTTPS source URL,
+and confidence (high/medium/low). Never invent a URL, publication, quote, or evidence.
+Correct errors; remove or qualify claims that search does not support. Keep the same scenes and story.
+Return ONLY JSON with:
+{{"scenes":[...],"claims":[{{"scene":1,"claim":"","evidence":"","source":"","source_url":"https://...","confidence":"medium"}}],"changes":["..."]}}
+Include only claims actually checked using search; do not say that this is independent human verification.
 
 SCRIPT:
 {script}"""
     try:
         out = gemini(prompt, grounding=True, temperature=0.2)
-        if out.get("scenes") and len(out["scenes"]) >= 8:
-            return out
+        scenes = out.get("scenes")
+        claims, reason = normalize_evidence(out, len(script.get("scenes", [])))
+        if (isinstance(scenes, list) and len(scenes) >= 8 and claims
+                and abs(len(scenes) - len(script.get("scenes", []))) <= 1):
+            result = dict(out)
+            result["sources"] = list(dict.fromkeys(row["source_url"] for row in claims))
+            result["_fact_check"] = evidence_record(claims)
+            return result
+        reason = reason or "fact-check response has an incomplete scene structure"
+        print("fact_check returned incomplete evidence; keeping original script")
     except Exception as e:
-        print("fact_check failed, keeping original:", e)
-    return script
-
+        reason = type(e).__name__
+        print("fact_check failed; keeping original script:", reason)
+    fallback = dict(script)
+    fallback["_fact_check"] = evidence_record([], reason)
+    return fallback
 
 def valid(script):
     v = cfg()["video"]
@@ -90,7 +120,15 @@ def valid(script):
         problems.append("hook_text must contain 3-5 words")
     if not sc or len(sc[-1].get("narration", "").split()) < 20:
         problems.append("missing documentary outro/payoff")
-    return problems
+    if script.get("story_schema_version") == 1:
+        from .story import quality_score
+        story_result = quality_score(script, require_evidence=False)
+        problems.extend(story_result["issues"])
+        minimum = int(cfg().get("story", {}).get("minimum_quality_score", 76))
+        if story_result["score"] < minimum:
+            problems.append(f"story quality score {story_result['score']} is below {minimum}")
+        script["story_quality"] = story_result
+    return list(dict.fromkeys(problems))
 
 
 def _fallback_terms(text, limit=4):
@@ -101,11 +139,26 @@ def _fallback_terms(text, limit=4):
     return words[:limit]
 
 
-def make_metadata(topic, scenes_with_times, sources, credits):
+def _fact_check_note(record):
+    record = record if isinstance(record, dict) else {}
+    if record.get("status") == "search_linked":
+        return ("search-assisted; claim/source links are recorded in the production manifest, "
+                "but still need editorial review.")
+    return "not search-verified for this run; factual claims need editorial review."
+
+
+def make_metadata(topic, scenes_with_times, sources, credits, fact_check=None, story_blueprint=None):
     chapters = "\n".join(f"{t} {s['title']}" for t, s in scenes_with_times)
     outline = "; ".join(s["title"] for _, s in scenes_with_times)
+    story_context = ""
+    if story_blueprint:
+        story_context = (f"Supported title promise: {story_blueprint.get('title_promise', '')}\n"
+                         f"Central question: {story_blueprint.get('central_question', '')}\n"
+                         f"Opening hook: {story_blueprint.get('scenes', [{}])[0].get('narration', '')}\n")
     prompt = f"""Create honest YouTube packaging for this researched documentary.
 Topic: {topic['topic']} | Angle: {topic['angle']} | Chapters: {outline}
+{story_context}
+The title and at least one thumbnail text must match the supported title promise and opening hook.
 1) Write 10 truthful title candidates (max 65 chars). Claims must be supported by the topic and chapter facts.
 2) Give 3 distinct thumbnail texts (2-4 words), each traceable to the topic, angle, or chapter names. No invented claim.
 3) Write a description: 2 punchy opening lines, then 2 short accurate paragraphs. Do NOT include chapters or sources.
@@ -136,7 +189,7 @@ Return JSON: {{"titles":[{{"title":"","curiosity":0,"clarity":0,"honesty":0}}],"
         titles = [{"title": str(topic.get("topic") or "Documentary"), "honesty": 10}]
     src = "\n".join("- " + s for s in sources[:8])
     desc = (f"{m.get('description', topic.get('topic', 'Documentary'))}\n\nCHAPTERS\n{chapters}\n\nSOURCES\n{src}\n\n"
-            f"FOOTAGE: {credits}\nNarration is AI-generated; research assisted by AI and fact-checked against web sources.")
+            f"FOOTAGE: {credits}\nNarration is AI-generated; {_fact_check_note(fact_check)}")
     anchors = set(w.lower() for w in _fallback_terms(
         topic.get("topic", "") + " " + topic.get("angle", "") + " " + outline, 80))
     fallback_texts = [" ".join(_fallback_terms(topic.get("topic"), 3)),
@@ -154,13 +207,24 @@ Return JSON: {{"titles":[{{"title":"","curiosity":0,"clarity":0,"honesty":0}}],"
         if not (2 <= len(words) <= 4 and claims and claims <= anchors):
             text = fallback_texts[i] or str(topic.get("topic", "DOCUMENTARY"))[:24]
         thumb_texts.append(text.upper())
-    return {
+    packaged = {
         "title": str(titles[0].get("title") or topic.get("topic", "Documentary"))[:100],
         "title_b": str((titles[1] if len(titles) > 1 else titles[0]).get("title") or topic.get("topic", "Documentary"))[:100],
         "thumb_texts": thumb_texts,
         "description": desc[:4900],
         "tags": m.get("tags", ["documentary", "research"])[:15],
     }
+    if story_blueprint:
+        from .story import validate_packaging
+        if validate_packaging(story_blueprint, packaged):
+            # Safe, literal fallback uses the script's own evidence-bounded promise.
+            promise_words = _fallback_terms(story_blueprint.get("title_promise", ""), 4)
+            packaged["title"] = str(story_blueprint.get("title_promise", topic.get("topic", "Documentary")))[:100]
+            promise_text = " ".join(promise_words[:3]).upper()
+            packaged["thumb_texts"][0] = promise_text or str(topic.get("topic", "DOCUMENTARY"))[:24].upper()
+            if validate_packaging(story_blueprint, packaged):
+                raise ValueError("generated title/thumbnail cannot be aligned to the story promise")
+    return packaged
 
 def beats(scenes, durs, plans):
     """Split each scene's narration across its shots, in proportion to shot length -> text spoken during each shot."""
@@ -184,7 +248,15 @@ def shot_queries(topic, script, scenes, beats_):
     setting = script.get("setting", "")
     for start in range(0, len(flat), 40):
         chunk = flat[start:start + 40]
-        lines = "\n".join(f"{start + k}. [{scenes[si]['title']}] {t[:240]}" for k, (si, t) in enumerate(chunk))
+        beat_lines = []
+        for k, (si, text) in enumerate(chunk):
+            scene = scenes[si]
+            plan = scene.get("visual_plan", {})
+            keywords = plan.get("footage_keywords", []) if isinstance(plan, dict) else []
+            visual_hint = (f"visual={plan.get('description', '')}; camera={plan.get('camera_movement', '')}; "
+                           f"keywords={', '.join(keywords[:4])}" if isinstance(plan, dict) else "")
+            beat_lines.append(f"{start + k}. [{scene.get('title', '')}] narration={text[:240]}; {visual_hint}")
+        lines = "\n".join(beat_lines)
         prompt = f"""You choose stock-footage search queries for a documentary about: {topic['topic']}.
 Real setting: {setting}
 Below are numbered beats: what the narrator says during one ~5 second shot. For EACH beat give:

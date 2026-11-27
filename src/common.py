@@ -1,4 +1,4 @@
-import json, os, re, time, datetime as dt
+import json, os, re, time, datetime as dt, tempfile
 from pathlib import Path
 import requests, yaml
 
@@ -23,21 +23,57 @@ def now():
 
 
 # ---------- memory (one json file per video => no merge conflicts) ----------
+def _save_json_atomic(path, value):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
+            json.dump(value, stream, indent=1, ensure_ascii=False)
+            stream.write("\n")
+        os.replace(temporary, path)
+    except Exception:
+        try:
+            os.unlink(temporary)
+        except OSError:
+            pass
+        raise
+
+
 def load_videos():
-    return [json.loads(p.read_text()) for p in sorted((MEM / "videos").glob("*.json"))]
+    videos = []
+    for path in sorted((MEM / "videos").glob("*.json")):
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(record, dict) and record.get("video_id"):
+                videos.append(record)
+            else:
+                print(f"ignoring invalid video memory record: {path.name}")
+        except (OSError, ValueError, TypeError) as exc:
+            print(f"ignoring unreadable video memory record {path.name}: {type(exc).__name__}")
+    return videos
 
 
 def save_video(rec):
-    (MEM / "videos" / f"{rec['video_id']}.json").write_text(json.dumps(rec, indent=1))
+    if not rec.get("video_id"):
+        raise ValueError("video memory record requires video_id")
+    _save_json_atomic(MEM / "videos" / f"{rec['video_id']}.json", rec)
 
 
 def load_insights():
     p = MEM / "insights.json"
-    return json.loads(p.read_text()) if p.exists() else {"weights": None, "lessons": []}
+    if not p.exists():
+        return {"weights": None, "lessons": []}
+    try:
+        value = json.loads(p.read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) else {"weights": None, "lessons": []}
+    except (OSError, ValueError, TypeError) as exc:
+        print(f"ignoring unreadable analytics insights: {type(exc).__name__}")
+        return {"weights": None, "lessons": []}
 
 
 def save_insights(d):
-    (MEM / "insights.json").write_text(json.dumps(d, indent=1))
+    _save_json_atomic(MEM / "insights.json", d)
 
 
 # ---------- gemini ----------
@@ -61,6 +97,7 @@ FREE_GEMINI_MODELS = (
 )
 
 _MODELS = None
+_GEMINI_PAUSED_REASON = None
 
 
 def _model_list(key):
@@ -94,6 +131,11 @@ class GeminiUnavailableError(RuntimeError):
 
 def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
            tries=None, request_timeout=90, total_timeout=300):
+    global _GEMINI_PAUSED_REASON
+    if _GEMINI_PAUSED_REASON:
+        raise GeminiUnavailableError(
+            f"Gemini paused for this run after {_GEMINI_PAUSED_REASON}"
+        )
     body = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {"maxOutputTokens": 32000},
@@ -148,8 +190,16 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
 
                 status = int(r.status_code)
                 status_counts[status] = status_counts.get(status, 0) + 1
-                last = f"{model}: HTTP {status}"
-                print(f"Gemini candidate unavailable: {model} HTTP {status}")
+                kinds = {
+                    400: "request format or model configuration",
+                    401: "API key authentication",
+                    403: "project permission or free-tier access",
+                    404: "model or endpoint configuration",
+                    429: "quota or rate limit",
+                }
+                kind = kinds.get(status, "temporary service failure" if status >= 500 else "HTTP error")
+                last = f"{model}: HTTP {status} ({kind})"
+                print(f"Gemini candidate unavailable: HTTP {status} ({kind})")
 
                 if status == 503 or status in (500, 502, 504):
                     # Capacity errors are model-wide; move to another model instead of
@@ -157,10 +207,15 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
                     overloaded = True
                     break
                 if status in (400, 404):
-                    # Invalid request/model: another key will not repair this candidate.
+                    # Request/model issues are not repaired by rotating credentials.
                     break
-                if status in (401, 403, 429):
-                    # These may be key/project-specific, so rotate to the next distinct key.
+                if status in (403, 429):
+                    # Do not rotate keys to evade project permissions or quota limits.
+                    # Stop Gemini for this process and let the configured provider fallback run.
+                    _GEMINI_PAUSED_REASON = f"HTTP {status} ({kind})"
+                    break
+                if status == 401:
+                    # A distinct configured key can fix an invalid credential.
                     continue
                 if status >= 400:
                     break
@@ -172,6 +227,8 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
                 continue
 
         if tries is not None and attempts >= tries:
+            break
+        if _GEMINI_PAUSED_REASON:
             break
         if deadline - time.monotonic() <= 0:
             break
@@ -192,12 +249,17 @@ GROQ_MODELS = (
     "qwen/qwen3.8-27b",
 )
 
+GROQ_GROUNDED_MODELS = (
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-120b",
+)
+
 
 class GroqUnavailableError(RuntimeError):
     """Raised after bounded attempts across configured Groq API keys and models."""
 
 
-def _groq(prompt, system=None, json_out=True, temperature=0.9,
+def _groq(prompt, system=None, json_out=True, temperature=0.9, grounding=False,
           request_timeout=20, total_timeout=90):
     keys = list(dict.fromkeys(k.strip() for k in (
         env("GROQ_API_KEY", False), env("GROQ_API_KEY_2", False),
@@ -215,7 +277,8 @@ def _groq(prompt, system=None, json_out=True, temperature=0.9,
     status_counts = {}
     last = "no usable response"
 
-    for model in GROQ_MODELS:
+    models = GROQ_GROUNDED_MODELS if grounding else GROQ_MODELS
+    for model in models:
         for key in keys:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -227,7 +290,10 @@ def _groq(prompt, system=None, json_out=True, temperature=0.9,
                 "temperature": temperature,
                 "max_completion_tokens": 4096,
             }
-            if json_out:
+            if grounding:
+                payload["tools"] = [{"type": "browser_search"}]
+                payload["tool_choice"] = "required"
+            elif json_out:
                 payload["response_format"] = {"type": "json_object"}
             try:
                 response = requests.post(
@@ -388,9 +454,21 @@ def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
             request_timeout=request_timeout, total_timeout=total_timeout,
         )
     except GeminiUnavailableError as gemini_error:
-        # Do not replace a Google Search grounded fact-check with an ungrounded answer.
         if grounding:
-            raise
+            # Groq browser_search supplies a real search step; do not substitute a
+            # plain text model and falsely label that result as grounded.
+            try:
+                print("Gemini Search unavailable; trying Groq browser-search fallback")
+                return _groq(
+                    prompt, system=system, json_out=json_out, temperature=temperature,
+                    grounding=True,
+                )
+            except GroqUnavailableError as groq_error:
+                if str(groq_error) == "No Groq API keys are configured":
+                    raise gemini_error
+                raise GeminiUnavailableError(
+                    f"{gemini_error}; Groq browser-search fallback failed: {groq_error}"
+                ) from groq_error
         errors = []
         providers = (
             ("Groq", _groq, GroqUnavailableError),
@@ -411,8 +489,22 @@ def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
 
 
 # ---------- notifications ----------
+def redact_secrets(value):
+    """Avoid leaking configured credentials through build diagnostics."""
+    text = str(value)
+    secrets = sorted({v.strip() for k, v in os.environ.items()
+                      if v and any(mark in k.upper() for mark in ("KEY", "TOKEN", "SECRET"))},
+                     key=len, reverse=True)
+    for secret in secrets:
+        text = text.replace(secret, "[REDACTED]")
+    text = re.sub(r"(?i)([?&](?:key|api_key|access_token)=)[^&\s]+", r"\1[REDACTED]", text)
+    text = re.sub(r"(?i)(/bot)[^/\s]+(/sendMessage)", r"\1[REDACTED]\2", text)
+    return text
+
+
 def notify(msg):
     tok, chat = env("TELEGRAM_BOT_TOKEN", False), env("TELEGRAM_CHAT_ID", False)
+    msg = redact_secrets(msg)
     print("NOTIFY:", msg)
     if tok and chat:
         try:
@@ -420,3 +512,4 @@ def notify(msg):
                           data={"chat_id": chat, "text": msg[:3500]}, timeout=20)
         except Exception:
             pass
+

@@ -1,1 +1,1 @@
-2026-11-24 v4: story-aware assets, mood editing, story-selected Shorts, media QA
+2026-11-27 v7: stricter scene-level narration budgets and actionable script retry feedback

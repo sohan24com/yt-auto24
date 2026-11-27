@@ -18,6 +18,7 @@ credits = set()
 attributions = []
 _cache = {}
 _all = []              # every downloaded asset (for last-resort reuse)
+_content_hashes = {}   # media bytes -> first asset id; catches cross-provider duplicates
 _wiki_used = [0]
 _last_pixabay = [0.0]
 
@@ -27,6 +28,7 @@ def reset():
     credits.clear()
     attributions.clear()
     _all.clear()
+    _content_hashes.clear()
     _wiki_used[0] = 0
 
 
@@ -98,7 +100,9 @@ def _pexels_videos(q):
         good = sorted([f for f in files if f["width"] >= 1280], key=lambda f: f["width"])
         pick = good[0] if good else (max(files, key=lambda f: f["width"]) if files else None)
         if pick:
-            out.append(("video", f"pexels-v{v['id']}", pick["link"], "Pexels", _slug(v.get("url"))))
+            out.append(("video", f"pexels-v{v['id']}", pick["link"], "Pexels", _slug(v.get("url")),
+                    {"asset_page": v.get("url", ""), "license": "Pexels License",
+                     "license_url": "https://www.pexels.com/license/"}))
     return out
 
 
@@ -108,7 +112,9 @@ def _pexels_photos(q):
         return []
     d = _get("https://api.pexels.com/v1/search", {"Authorization": k},
              params={"query": q, "per_page": 8, "orientation": "landscape"})
-    return [("image", f"pexels-p{p['id']}", p["src"]["large2x"], "Pexels", p.get("alt", "") + " " + _slug(p.get("url")))
+    return [("image", f"pexels-p{p['id']}", p["src"]["large2x"], "Pexels", p.get("alt", "") + " " + _slug(p.get("url")),
+             {"asset_page": p.get("url", ""), "license": "Pexels License",
+              "license_url": "https://www.pexels.com/license/"})
             for p in d.get("photos", [])]
 
 
@@ -122,7 +128,10 @@ def _pixabay_videos(q):
         v = h.get("videos", {})
         pick = next((v[s]["url"] for s in ("large", "medium") if v.get(s, {}).get("url")), None)
         if pick:
-            out.append(("video", f"pixabay-v{h['id']}", pick, "Pixabay", h.get("tags", "")))
+            out.append(("video", f"pixabay-v{h['id']}", pick, "Pixabay", h.get("tags", ""),
+                        {"asset_page": f"https://pixabay.com/videos/id-{h['id']}/",
+                         "license": "Pixabay Content License",
+                         "license_url": "https://pixabay.com/service/license/"}))
     return out
 
 
@@ -132,7 +141,9 @@ def _pixabay_photos(q):
         return []
     d = _get("https://pixabay.com/api/", params={"key": k, "q": q, "image_type": "photo",
                                                    "orientation": "horizontal", "per_page": 10, "min_width": 1280})
-    return [("image", f"pixabay-p{h['id']}", h["largeImageURL"], "Pixabay", h.get("tags", "")) for h in d.get("hits", [])]
+    return [("image", f"pixabay-p{h['id']}", h["largeImageURL"], "Pixabay", h.get("tags", ""),
+             {"asset_page": h.get("pageURL", ""), "license": "Pixabay Content License",
+              "license_url": "https://pixabay.com/service/license/"}) for h in d.get("hits", [])]
 
 
 def _nasa(q):
@@ -149,34 +160,55 @@ def _nasa(q):
                 if media == "video":
                     big.sort(key=lambda a: 0 if "~large" in a else 1 if "~medium" in a else 2)
                 if big:
-                    out.append((media, f"nasa-{nid}", big[0].replace(" ", "%20"), "NASA", title))
+                    out.append((media, f"nasa-{nid}", big[0].replace(" ", "%20"), "NASA", title,
+                            {"asset_page": f"https://images.nasa.gov/details/{nid}",
+                             "license": "NASA media usage terms (review third-party restrictions)",
+                             "license_url": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+                             "license_status": "review_required"}))
         except Exception:
             continue
     return out
 
 
 def _archive(q):
+    """Return only Internet Archive items with a recorded public-domain/CC0/CC BY license."""
     out = []
     try:
         query = (f"({q}) AND mediatype:movies AND "
-                 "(collection:prelinger OR collection:nasa OR licenseurl:*publicdomain*)")
+                 "(collection:prelinger OR collection:nasa OR licenseurl:*publicdomain* OR "
+                 "licenseurl:*creativecommons.org/licenses/by/*)")
         d = requests.get("https://archive.org/advancedsearch.php",
                          params={"q": query, "fl[]": "identifier", "rows": 4, "output": "json",
                                  "sort[]": "downloads desc"}, timeout=30).json()
         for doc in d["response"]["docs"][:3]:
             ident = doc["identifier"]
             meta = requests.get(f"https://archive.org/metadata/{ident}", timeout=30).json()
+            metadata = meta.get("metadata", {})
+            license_url = str(metadata.get("licenseurl", "")).strip()
+            license_name = str(metadata.get("license", "") or metadata.get("rights", "")).strip()
+            low = license_url.lower()
+            if "creativecommons.org/publicdomain/zero" in low:
+                license_status = "allowed_public_domain"
+            elif "creativecommons.org/licenses/by/" in low and "by-sa" not in low:
+                license_status = "allowed_attribution"
+            elif "publicdomain" in low or "public-domain" in low:
+                license_status = "allowed_public_domain"
+            else:
+                continue
             files = [f for f in meta.get("files", [])
                      if f.get("name", "").lower().endswith(".mp4") and f.get("size", "0").isdigit()
                      and 2 << 20 < int(f["size"]) < 80 << 20]
             if files:
                 best = max(files, key=lambda f: int(f["size"]))
-                out.append(("video", f"archive-{ident}", f"https://archive.org/download/{ident}/{quote(best['name'])}",
-                            "Internet Archive (public domain)", ident.replace("_", " ").replace("-", " ")))
+                out.append(("video", f"archive-{ident}",
+                            f"https://archive.org/download/{ident}/{quote(best['name'])}",
+                            "Internet Archive", ident.replace("_", " ").replace("-", " "),
+                            {"asset_page": f"https://archive.org/details/{ident}",
+                             "license": license_name or license_status,
+                             "license_url": license_url, "license_status": license_status}))
     except Exception:
         pass
     return out
-
 
 def _stock(q, with_photos):
     key = (q, with_photos)
@@ -215,7 +247,13 @@ def wiki_pool(terms, wd):
             if url and (dest.exists() or _download(url, dest, UA)):
                 pool.append({"path": dest, "kind": "image", "reused": False, "source": "Wikimedia Commons",
                              "words": _words(term + " " + title), "used": False,
-                             "credit": f"{title} - {artist} ({lic})"})
+                             "credit": f"{title} - {artist} ({lic})",
+                             "asset_id": f"commons-{pg['pageid']}",
+                             "source_url": f"https://commons.wikimedia.org/wiki/{quote(title.replace(' ', '_'))}",
+                             "license": lic,
+                             "license_url": md.get("LicenseUrl", {}).get("value", ""),
+                             "license_status": "allowed_attribution" if lic.lower().startswith("cc by") else "allowed_public_domain",
+                             "illustrative": False})
                 n += 1
             if n >= 3:
                 break
@@ -227,13 +265,43 @@ def wiki_pool(terms, wd):
 def _try(cands, q, used, wd, min_score):
     ranked = sorted((c for c in cands if c[1] not in used and _score(q, c[4]) >= min_score),
                     key=lambda c: (-_score(q, c[4]), c[0] != "video", random.random()))
-    for kind, uid, url, source, match_text in ranked[:4]:
+    for candidate in ranked[:4]:
+        kind, uid, url, source, match_text = candidate[:5]
+        source_meta = candidate[5] if len(candidate) > 5 and isinstance(candidate[5], dict) else {}
         dest = Path(wd) / f"{uid}.{'mp4' if kind == 'video' else 'jpg'}"
         if dest.exists() or _download(url, dest):
             used.add(uid)
             credits.add(source)
+            defaults = {
+                "Pexels": ("Pexels License", "https://www.pexels.com/license/", "provider_terms"),
+                "Pixabay": ("Pixabay Content License", "https://pixabay.com/service/license/", "provider_terms"),
+            }
+            license_name, license_url, license_status = defaults.get(
+                source, ("unknown", "", "review_required"))
+            license_name = source_meta.get("license", license_name)
+            license_url = source_meta.get("license_url", license_url)
+            license_status = source_meta.get("license_status", license_status)
+            if license_status == "review_required":
+                dest.unlink(missing_ok=True)
+                continue
+            if not dest.is_file() or dest.stat().st_size == 0:
+                dest.unlink(missing_ok=True)
+                continue
+            digest = hashlib.sha256(dest.read_bytes()).hexdigest()
+            if digest in _content_hashes:
+                dest.unlink(missing_ok=True)
+                continue
+            _content_hashes[digest] = uid
+            credit = f"{match_text} ({source}; {license_name})"
+            if license_status == "allowed_attribution":
+                attributions.append(f"{credit} - {source_meta.get('asset_page', url)}")
             a = {"path": dest, "kind": kind, "reused": False, "source": source,
-                 "match_words": _words(q + " " + match_text), "match_score": _score(q, match_text)}
+                 "asset_id": uid, "source_url": source_meta.get("asset_page", url),
+                 "license": license_name, "license_url": license_url,
+                 "license_status": license_status, "illustrative": source in ("Pexels", "Pixabay"),
+                 "credit": credit, "content_hash": digest}
+            a.update({"match_words": _words(q + " " + match_text),
+                      "match_score": _score(q, match_text)})
             _all.append(a)
             return a
     return None
@@ -280,8 +348,87 @@ def _context_card(query, beat, setting, wd):
                font=label_font, fill=(188, 198, 214))
         im.save(dest)
     return {"path": dest, "kind": "image", "reused": False, "source": "Generated context card",
+            "asset_id": key, "source_url": f"urn:yt-auto24:context:{key}",
+            "license": "Original generated graphic", "license_url": "",
+            "license_status": "original_generated", "illustrative": True,
             "match_words": _words(query + " " + beat + " " + setting), "match_score": 0,
             "is_context_fallback": True}
+
+
+def _timeline_card(beat, setting, wd):
+    """Render a chronology only from distinct years explicitly present in narration."""
+    years = list(dict.fromkeys(re.findall(r"\b(?:1[0-9]{3}|20[0-2][0-9])\b", str(beat))))
+    years = sorted(years, key=int)[:5]
+    if len(years) < 2:
+        return None
+    sentences = re.split(r"(?<=[.!?])\s+", str(beat))
+    labels = {}
+    for year in years:
+        sentence = next((row for row in sentences if year in row), "")
+        sentence = re.sub(r"\b(?:1[0-9]{3}|20[0-2][0-9])\b", "", sentence)
+        sentence = re.sub(r"[^A-Za-z0-9 ,'-]", "", sentence)
+        labels[year] = " ".join(sentence.split())[:42] or "Documented event"
+    key = hashlib.sha1(("timeline|" + "|".join(years) + "|" + str(beat)).encode()).hexdigest()[:12]
+    dest = Path(wd) / f"timeline-{key}.png"
+    if not dest.is_file():
+        width, height = 1920, 1080
+        image = Image.new("RGB", (width, height), (14, 20, 33))
+        draw = ImageDraw.Draw(image)
+        for x in range(90, width, 90):
+            draw.line((x, 0, x, height), fill=(22, 31, 47), width=1)
+        for y in range(90, height, 90):
+            draw.line((0, y, width, y), fill=(22, 31, 47), width=1)
+        def font(names, size):
+            for name in names:
+                try:
+                    return ImageFont.truetype(name, size)
+                except OSError:
+                    continue
+            return ImageFont.load_default()
+        kicker = font(["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                       "C:/Windows/Fonts/arialbd.ttf"], 28)
+        year_font = font(["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                          "C:/Windows/Fonts/arialbd.ttf"], 64)
+        body = font(["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                     "C:/Windows/Fonts/arial.ttf"], 27)
+        title_font = font(["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                           "C:/Windows/Fonts/arialbd.ttf"], 48)
+        draw.text((110, 92), "CHRONOLOGY · FROM NARRATION", font=kicker, fill=(210, 164, 91))
+        draw.text((110, 150), str(setting or "Documented sequence")[:62],
+                  font=title_font, fill=(242, 239, 229))
+        left, right, line_y = 160, width - 160, 505
+        draw.line((left, line_y, right, line_y), fill=(201, 157, 88), width=5)
+        for i, year in enumerate(years):
+            x = left + round((right - left) * i / max(1, len(years) - 1))
+            top = i % 2 == 0
+            elbow = line_y - 105 if top else line_y + 105
+            draw.ellipse((x - 13, line_y - 13, x + 13, line_y + 13), fill=(242, 206, 140))
+            draw.line((x, line_y, x, elbow), fill=(111, 132, 155), width=2)
+            draw.text((x - 55, elbow - 82 if top else elbow + 22), year,
+                      font=year_font, fill=(244, 221, 176))
+            label = labels[year]
+            words, rows, row = label.split(), [], ""
+            for word in words:
+                trial = (row + " " + word).strip()
+                if draw.textlength(trial, font=body) > 340 and row:
+                    rows.append(row); row = word
+                else:
+                    row = trial
+            if row:
+                rows.append(row)
+            text_x = min(max(105, x - 170), width - 445)
+            text_y = elbow - 8 if top else elbow + 70
+            for j, line in enumerate(rows[:3]):
+                draw.text((text_x, text_y + j * 38), line, font=body, fill=(207, 216, 226))
+        draw.text((110, 940), "EVENTS AND DATES ARE TAKEN FROM CHECKED NARRATION",
+                  font=kicker, fill=(151, 164, 181))
+        image.save(dest)
+    return {"path": dest, "kind": "image", "reused": False, "source": "Generated timeline",
+            "asset_id": key, "source_url": f"urn:yt-auto24:timeline:{key}",
+            "license": "Original generated graphic", "license_url": "",
+            "license_status": "original_generated", "illustrative": True,
+            "match_words": _words(str(beat) + " " + str(setting)), "match_score": 1,
+            "is_generated_graphic": True}
 
 
 def gather_shot(q, alt, beat, setting, used, wd, wiki, wiki_cap=0.3, total_shots=100):
@@ -289,6 +436,12 @@ def gather_shot(q, alt, beat, setting, used, wd, wiki, wiki_cap=0.3, total_shots
     bw = _words(beat)
     qwords = _words(q + " " + alt)
     target = bw | qwords
+    if re.search(r"\b(?:before|after|later|earlier|between|by|from|until|century|decade)\b",
+                 str(beat), re.I):
+        timeline = _timeline_card(beat, setting, wd)
+        if timeline:
+            credits.add("Generated timeline graphics")
+            return timeline
     if wiki and _wiki_used[0] < wiki_cap * total_shots:
         for w in wiki:
             if not w["used"] and (w["words"] & target):
@@ -297,6 +450,10 @@ def gather_shot(q, alt, beat, setting, used, wd, wiki, wiki_cap=0.3, total_shots
                 attributions.append(w["credit"])
                 credits.add("Wikimedia Commons")
                 return {"path": w["path"], "kind": "image", "reused": False, "source": "Wikimedia Commons",
+                        "asset_id": w["asset_id"], "source_url": w["source_url"],
+                        "license": w["license"], "license_url": w["license_url"],
+                        "license_status": w["license_status"], "illustrative": False,
+                        "credit": w["credit"],
                         "match_words": w["words"], "match_score": len(w["words"] & target)}
     setting_q = " ".join((setting or "").split()[:5])
     queries = list(dict.fromkeys(x for x in (q, alt, setting_q) if x))

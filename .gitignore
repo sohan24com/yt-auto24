@@ -1,4 +1,6 @@
 __pycache__/
+.venv/
+.work/
 client_secret*.json
 *.pyc
 tools/.youtube_refresh_token
