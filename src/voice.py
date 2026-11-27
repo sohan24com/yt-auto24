@@ -103,8 +103,7 @@ def _gemini(text, out, emotion, keys):
     v = cfg()["video"]
     direction = emotion or "calm and cinematic"
     prompt = f"Say in a {direction} documentary narrator voice, with natural pauses and expressive emphasis:\n\n{_clean(text)}"
-    for attempt in range(len(keys)):
-        key = keys[attempt]
+    for attempt, key in enumerate(keys):
         try:   # 1) Interactions API (current docs)
             r = requests.post("https://generativelanguage.googleapis.com/v1beta/interactions",
                               headers={"x-goog-api-key": key, "Content-Type": "application/json"},
@@ -115,7 +114,11 @@ def _gemini(text, out, emotion, keys):
             if r.status_code == 200 and _find_audio(r.json()):
                 _write_audio(_find_audio(r.json()), out)
                 return True
-            print("gemini tts (interactions):", r.status_code, r.text[:140])
+            print("Gemini TTS interactions:", _tts_status(r.status_code))
+            if r.status_code in (401, 403, 429):
+                # Authentication, permission, and quota failures do not improve by
+                # retrying another endpoint or key. The caller will use another engine.
+                return False
         except Exception as e:
             print("gemini tts (interactions) error:", repr(e)[:140])
         try:   # 2) classic generateContent TTS
@@ -127,11 +130,26 @@ def _gemini(text, out, emotion, keys):
             if r.status_code == 200 and _find_audio(r.json()):
                 _write_audio(_find_audio(r.json()), out)
                 return True
-            print("gemini tts (generateContent):", r.status_code, r.text[:140])
+            print("Gemini TTS generateContent:", _tts_status(r.status_code))
+            if r.status_code in (400, 401, 403, 404, 429):
+                # The same configured request/model will fail with another key too.
+                return False
         except Exception as e:
             print("gemini tts (generateContent) error:", repr(e)[:140])
-        time.sleep(6 * (attempt + 1))
+        if attempt + 1 < len(keys):
+            time.sleep(6 * (attempt + 1))
     return False
+
+
+def _tts_status(status):
+    kinds = {
+        400: "request format or audio generation failure",
+        401: "API key authentication",
+        403: "project permission or free-tier access",
+        404: "model or endpoint configuration",
+        429: "quota or rate limit",
+    }
+    return f"HTTP {status} ({kinds.get(status, 'temporary service failure' if status >= 500 else 'HTTP error')})"
 
 
 def _to_wav(src, wav):

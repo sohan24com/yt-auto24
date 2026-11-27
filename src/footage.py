@@ -2,12 +2,14 @@
 One search query per SHOT (written from the sentence spoken during that shot), results re-ranked by how well
 their tags/title match the query, plus real photos of real places from Wikimedia Commons (CC0 / public
 domain / CC BY only, with attribution added to the description)."""
-import hashlib, html, os, random, re, requests, time
+import hashlib, html, os, re, requests, time
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 from urllib.parse import quote
+from .media import SearchRequest, search as search_media
+from .media.search import research_credits
+from .media.downloader import download as safe_media_download
 
-FALLBACK = ["dark cinematic landscape", "old map parchment", "night sky stars", "misty mountains", "ancient architecture"]
 STOP = set("the and with for from over under into this that were was are his her their its they them have has had "
            "been will would could then than when what which while about after before video stock footage".split())
 SPACE_WORDS = ("space", "planet", "star", "galaxy", "moon", "mars", "earth", "sun", "astronaut", "rocket",
@@ -18,8 +20,10 @@ credits = set()
 attributions = []
 _cache = {}
 _all = []              # every downloaded asset (for last-resort reuse)
+_source_counts = {}
+_role_counts = {}
+_coverr_attempts = [0]
 _wiki_used = [0]
-_last_pixabay = [0.0]
 
 
 def reset():
@@ -27,6 +31,10 @@ def reset():
     credits.clear()
     attributions.clear()
     _all.clear()
+    _cache.clear()
+    _source_counts.clear()
+    _role_counts.clear()
+    _coverr_attempts[0] = 0
     _wiki_used[0] = 0
 
 
@@ -45,11 +53,6 @@ def _score(query, text):
 def _get(url, headers=None, **kw):
     for i in range(3):
         try:
-            if "pixabay.com" in url:                       # Pixabay allows ~100 requests/minute
-                wait = 0.7 - (time.time() - _last_pixabay[0])
-                if wait > 0:
-                    time.sleep(wait)
-                _last_pixabay[0] = time.time()
             r = requests.get(url, headers=headers, timeout=30, **kw)
             if r.status_code == 429:
                 time.sleep(30)
@@ -61,161 +64,103 @@ def _get(url, headers=None, **kw):
     return {}
 
 
-def _download(url, dest, headers=None):
-    dest = Path(dest)
+def _download(url, dest, headers=None, cache_key=None):
     try:
-        with requests.get(url, stream=True, timeout=60, headers=headers) as r:
-            r.raise_for_status()
-            size = 0
-            with open(dest, "wb") as f:
-                for chunk in r.iter_content(1 << 20):
-                    size += len(chunk)
-                    if size > 90 << 20:
-                        raise ValueError("download exceeds 90 MB limit")
-                    f.write(chunk)
-        if size == 0:
-            raise ValueError("download returned an empty file")
-        return True
+        from .common import cfg
+        settings = cfg().get("media", {})
     except Exception:
-        dest.unlink(missing_ok=True)
-        return False
+        settings = {}
+    max_bytes = max(1, int(settings.get("max_download_mb", os.getenv("MEDIA_MAX_DOWNLOAD_MB", "90")))) << 20
+    cache_dir = Path(settings.get("cache_dir", ".media-cache")) / "assets"
+    return safe_media_download(
+        url, dest, max_bytes=max_bytes, headers=headers, cache_key=cache_key,
+        cache_directory=cache_dir,
+        cache_ttl_days=settings.get("asset_cache_ttl_days", 7),
+        cache_max_total_bytes=int(settings.get("asset_cache_max_mb", 512)) << 20,
+    )
 
 
-def _slug(url):
-    return (url or "").rstrip("/").split("/")[-1].replace("-", " ")
+def _stock(q, with_photos, scene_context=None):
+    scene_context = scene_context or {}
+    key = (q, with_photos, tuple(sorted(scene_context.items())))
+    if key not in _cache:
+        types = ("video", "image") if with_photos else ("video",)
+        providers = ("pexels", "pixabay", "openverse", "wikimedia_commons") if with_photos else (
+            "pexels", "pixabay")
+        request = SearchRequest(
+            topic=scene_context.get("topic", ""),
+            scene_description=scene_context.get("scene_description", q),
+            narration=scene_context.get("narration", ""),
+            story_beat=scene_context.get("story_beat", q),
+            location=scene_context.get("location", ""),
+            historical_period=scene_context.get("historical_period", ""),
+            mood=scene_context.get("mood", ""), required_visual=q,
+            scene_duration=float(scene_context.get("scene_duration", 0) or 0),
+            media_types=types, providers=providers, limit_per_source=8)
+        _cache[key] = _legacy_candidates(search_media(request))
+    return _cache[key]
 
 
-# ---------------- providers: each returns [(kind, uid, url, source, text)] ----------------
-def _pexels_videos(q):
-    k = _key("PEXELS_API_KEY")
-    if not k:
-        return []
-    d = _get("https://api.pexels.com/videos/search", {"Authorization": k},
-             params={"query": q, "per_page": 10, "orientation": "landscape"})
-    out = []
-    for v in d.get("videos", []):
-        files = [f for f in v["video_files"] if f.get("file_type") == "video/mp4" and f.get("width")]
-        good = sorted([f for f in files if f["width"] >= 1280], key=lambda f: f["width"])
-        pick = good[0] if good else (max(files, key=lambda f: f["width"]) if files else None)
-        if pick:
-            out.append(("video", f"pexels-v{v['id']}", pick["link"], "Pexels", _slug(v.get("url")),
-                    {"asset_page": v.get("url", ""), "license": "Pexels License",
-                     "license_url": "https://www.pexels.com/license/"}))
-    return out
-
-
-def _pexels_photos(q):
-    k = _key("PEXELS_API_KEY")
-    if not k:
-        return []
-    d = _get("https://api.pexels.com/v1/search", {"Authorization": k},
-             params={"query": q, "per_page": 8, "orientation": "landscape"})
-    return [("image", f"pexels-p{p['id']}", p["src"]["large2x"], "Pexels", p.get("alt", "") + " " + _slug(p.get("url")),
-             {"asset_page": p.get("url", ""), "license": "Pexels License",
-              "license_url": "https://www.pexels.com/license/"})
-            for p in d.get("photos", [])]
-
-
-def _pixabay_videos(q):
-    k = _key("PIXABAY_API_KEY")
-    if not k:
-        return []
-    d = _get("https://pixabay.com/api/videos/", params={"key": k, "q": q, "per_page": 12})
-    out = []
-    for h in d.get("hits", []):
-        v = h.get("videos", {})
-        pick = next((v[s]["url"] for s in ("large", "medium") if v.get(s, {}).get("url")), None)
-        if pick:
-            out.append(("video", f"pixabay-v{h['id']}", pick, "Pixabay", h.get("tags", ""),
-                        {"asset_page": f"https://pixabay.com/videos/id-{h['id']}/",
-                         "license": "Pixabay Content License",
-                         "license_url": "https://pixabay.com/service/license/"}))
-    return out
-
-
-def _pixabay_photos(q):
-    k = _key("PIXABAY_API_KEY")
-    if not k:
-        return []
-    d = _get("https://pixabay.com/api/", params={"key": k, "q": q, "image_type": "photo",
-                                                   "orientation": "horizontal", "per_page": 10, "min_width": 1280})
-    return [("image", f"pixabay-p{h['id']}", h["largeImageURL"], "Pixabay", h.get("tags", ""),
-             {"asset_page": h.get("pageURL", ""), "license": "Pixabay Content License",
-              "license_url": "https://pixabay.com/service/license/"}) for h in d.get("hits", [])]
+def _legacy_candidates(assets):
+    """Adapt normalized research records to the editor's stable candidate tuple."""
+    candidates = []
+    for asset in assets:
+        kind = "video" if asset.media_type == "video" else "image" if asset.media_type == "image" else "audio"
+        if kind == "audio":
+            continue
+        text = " ".join(filter(None, (asset.title, asset.creator,
+                                     str(asset.extra.get("tags", "")))))
+        metadata = {
+            "asset_page": asset.source_url, "license": asset.license_name,
+            "license_url": asset.license_url, "license_status": asset.license_status,
+            "mime": asset.extra.get("mime", ""),
+            "creator": asset.creator, "credit": asset.attribution,
+            "attribution_required": asset.attribution_required,
+            "authenticity": asset.authenticity, "verified_authentic": asset.verified_authentic,
+            "visual_role": asset.visual_role, "mood_fit": asset.mood_fit,
+            "restrictions": asset.restrictions, "width": asset.width, "height": asset.height,
+            "duration": asset.duration, "quality_score": asset.quality_score,
+            "relevance": asset.relevance, "direct_url": asset.direct_url,
+            "download_date": asset.download_date,
+        }
+        candidates.append((kind, asset.asset_id, asset.direct_url, asset.source, text, metadata))
+    return candidates
 
 
 def _nasa(q):
-    out = []
-    for media in ("image", "video"):
-        try:
-            d = requests.get("https://images-api.nasa.gov/search", params={"q": q, "media_type": media}, timeout=30).json()
-            for it in d["collection"]["items"][:3]:
-                nid = it["data"][0]["nasa_id"]
-                title = it["data"][0].get("title", "")
-                assets = requests.get(it["href"], timeout=30).json()
-                pat = r"~(large|medium)\.jpg$" if media == "image" else r"~(large|medium|orig)\.mp4$"
-                big = [a for a in assets if re.search(pat, a)]
-                if media == "video":
-                    big.sort(key=lambda a: 0 if "~large" in a else 1 if "~medium" in a else 2)
-                if big:
-                    out.append((media, f"nasa-{nid}", big[0].replace(" ", "%20"), "NASA", title,
-                            {"asset_page": f"https://images.nasa.gov/details/{nid}",
-                             "license": "NASA media usage terms (review third-party restrictions)",
-                             "license_url": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
-                             "license_status": "review_required"}))
-        except Exception:
-            continue
-    return out
+    request = SearchRequest(required_visual=q, scene_description=q, story_beat=q,
+                            media_types=("video", "image"), providers=("nasa",), limit_per_source=8)
+    return _legacy_candidates(search_media(request))
+
+
+def _coverr(q, scene_context):
+    try:
+        from .common import cfg
+        per_build_limit = int(cfg().get("media", {}).get("coverr_max_searches_per_build", 12))
+    except Exception:
+        per_build_limit = 12
+    if not _key("COVERR_API_KEY") or _coverr_attempts[0] >= per_build_limit:
+        return []
+    _coverr_attempts[0] += 1
+    request = SearchRequest(required_visual=q,
+                            scene_description=scene_context.get("scene_description", q),
+                            story_beat=scene_context.get("story_beat", q),
+                            location=scene_context.get("location", ""),
+                            mood=scene_context.get("mood", ""),
+                            scene_duration=float(scene_context.get("scene_duration", 0) or 0),
+                            media_types=("video",), providers=("coverr",), limit_per_source=6)
+    return _legacy_candidates(search_media(request))
 
 
 def _archive(q):
-    """Return only Internet Archive items with a recorded public-domain/CC0/CC BY license."""
-    out = []
-    try:
-        query = (f"({q}) AND mediatype:movies AND "
-                 "(collection:prelinger OR collection:nasa OR licenseurl:*publicdomain* OR "
-                 "licenseurl:*creativecommons.org/licenses/by/*)")
-        d = requests.get("https://archive.org/advancedsearch.php",
-                         params={"q": query, "fl[]": "identifier", "rows": 4, "output": "json",
-                                 "sort[]": "downloads desc"}, timeout=30).json()
-        for doc in d["response"]["docs"][:3]:
-            ident = doc["identifier"]
-            meta = requests.get(f"https://archive.org/metadata/{ident}", timeout=30).json()
-            metadata = meta.get("metadata", {})
-            license_url = str(metadata.get("licenseurl", "")).strip()
-            license_name = str(metadata.get("license", "") or metadata.get("rights", "")).strip()
-            low = license_url.lower()
-            if "creativecommons.org/publicdomain/zero" in low:
-                license_status = "allowed_public_domain"
-            elif "creativecommons.org/licenses/by/" in low and "by-sa" not in low:
-                license_status = "allowed_attribution"
-            elif "publicdomain" in low or "public-domain" in low:
-                license_status = "allowed_public_domain"
-            else:
-                continue
-            files = [f for f in meta.get("files", [])
-                     if f.get("name", "").lower().endswith(".mp4") and f.get("size", "0").isdigit()
-                     and 2 << 20 < int(f["size"]) < 80 << 20]
-            if files:
-                best = max(files, key=lambda f: int(f["size"]))
-                out.append(("video", f"archive-{ident}",
-                            f"https://archive.org/download/{ident}/{quote(best['name'])}",
-                            "Internet Archive", ident.replace("_", " ").replace("-", " "),
-                            {"asset_page": f"https://archive.org/details/{ident}",
-                             "license": license_name or license_status,
-                             "license_url": license_url, "license_status": license_status}))
-    except Exception:
-        pass
-    return out
-
-def _stock(q, with_photos):
-    key = (q, with_photos)
-    if key not in _cache:
-        c = _pexels_videos(q) + _pixabay_videos(q)
-        if with_photos:
-            c += _pexels_photos(q) + _pixabay_photos(q)
-        _cache[key] = c
-    return _cache[key]
+    historical = any(word in q.lower() for word in
+                     ("historical", "history", "ancient", "century", "war", "archive", "archival", "map"))
+    providers = ("internet_archive", "wikimedia_commons", "library_of_congress") if historical else (
+        "internet_archive",)
+    request = SearchRequest(required_visual=q, scene_description=q, story_beat=q,
+                            historical_period="historical archive" if historical else "",
+                            media_types=("video", "image"), providers=providers, limit_per_source=5)
+    return _legacy_candidates(search_media(request))
 
 
 # ---------------- Wikimedia Commons: real photos of real places/objects ----------------
@@ -241,11 +186,12 @@ def wiki_pool(terms, wd):
             artist = re.sub(r"<[^>]+>", "", html.unescape(md.get("Artist", {}).get("value", ""))).strip()[:60] or "unknown"
             title = pg.get("title", "").replace("File:", "")[:70]
             url = ii.get("thumburl") or ii.get("url")
-            dest = wd / f"wiki-{pg['pageid']}.jpg"
-            if url and (dest.exists() or _download(url, dest, UA)):
+            extension = ".png" if ii.get("mime") == "image/png" else ".jpg"
+            dest = wd / f"wiki-{pg['pageid']}{extension}"
+            if url and (dest.exists() or _download(url, dest, UA, cache_key=f"commons-{pg['pageid']}")):
                 pool.append({"path": dest, "kind": "image", "reused": False, "source": "Wikimedia Commons",
                              "words": _words(term + " " + title), "used": False,
-                             "credit": f"{title} - {artist} ({lic})",
+                             "credit": f"{title} - {artist} ({lic}) — https://commons.wikimedia.org/wiki/{quote(title.replace(' ', '_'))}",
                              "asset_id": f"commons-{pg['pageid']}",
                              "source_url": f"https://commons.wikimedia.org/wiki/{quote(title.replace(' ', '_'))}",
                              "license": lic,
@@ -261,37 +207,73 @@ def wiki_pool(terms, wd):
 
 # ---------------- one asset per shot ----------------
 def _try(cands, q, used, wd, min_score):
-    ranked = sorted((c for c in cands if c[1] not in used and _score(q, c[4]) >= min_score),
-                    key=lambda c: (-_score(q, c[4]), c[0] != "video", random.random()))
+    def rank(candidate):
+        metadata = candidate[5] if len(candidate) > 5 and isinstance(candidate[5], dict) else {}
+        license_bonus = {"allowed_public_domain": 10, "allowed_attribution": 9, "provider_terms": 8}.get(
+            metadata.get("license_status"), 0)
+        role = metadata.get("visual_role", "general")
+        source_penalty = min(14, _source_counts.get(candidate[3], 0) * 1.5)
+        role_penalty = min(12, _role_counts.get(role, 0) * 3)
+        return (_score(q, candidate[4]) * 10 + float(metadata.get("quality_score", 0) or 0) * 0.35
+                + license_bonus - source_penalty - role_penalty)
+
+    selected_urls = {a.get("direct_url") for a in _all if a.get("direct_url")}
+    ranked = sorted((c for c in cands if c[1] not in used and c[2] not in selected_urls
+                     and _score(q, c[4]) >= min_score),
+                    key=lambda c: (-rank(c), c[0] != "video", str(c[1])))
     for candidate in ranked[:4]:
         kind, uid, url, source, match_text = candidate[:5]
         source_meta = candidate[5] if len(candidate) > 5 and isinstance(candidate[5], dict) else {}
-        dest = Path(wd) / f"{uid}.{'mp4' if kind == 'video' else 'jpg'}"
-        if dest.exists() or _download(url, dest):
+        defaults = {
+            "Pexels": ("Pexels License", "https://www.pexels.com/license/", "provider_terms"),
+            "Pixabay": ("Pixabay Content License", "https://pixabay.com/service/license/", "provider_terms"),
+        }
+        license_name, license_url, license_status = defaults.get(source, ("unknown", "", "review_required"))
+        license_name = source_meta.get("license", license_name)
+        license_url = source_meta.get("license_url", license_url)
+        license_status = source_meta.get("license_status", license_status)
+        source_url = source_meta.get("asset_page", source_meta.get("source_url", url))
+        if license_status == "review_required" or not url or not source_url or not license_url:
+            continue
+        mime = str(source_meta.get("mime", "")).lower()
+        extension = (".mp4" if kind == "video" else
+                     ".png" if mime == "image/png" else
+                     ".webp" if mime == "image/webp" else ".jpg")
+        dest = Path(wd) / f"{uid}{extension}"
+        download_info = {"size_bytes": dest.stat().st_size} if dest.exists() else \
+            _download(url, dest, cache_key=uid)
+        if download_info:
             used.add(uid)
             credits.add(source)
-            defaults = {
-                "Pexels": ("Pexels License", "https://www.pexels.com/license/", "provider_terms"),
-                "Pixabay": ("Pixabay Content License", "https://pixabay.com/service/license/", "provider_terms"),
-            }
-            license_name, license_url, license_status = defaults.get(
-                source, ("unknown", "", "review_required"))
-            license_name = source_meta.get("license", license_name)
-            license_url = source_meta.get("license_url", license_url)
-            license_status = source_meta.get("license_status", license_status)
-            if license_status == "review_required":
-                dest.unlink(missing_ok=True)
-                continue
-            credit = f"{match_text} ({source}; {license_name})"
-            if license_status == "allowed_attribution":
-                attributions.append(f"{credit} - {source_meta.get('asset_page', url)}")
-            a = {"path": dest, "kind": kind, "reused": False, "source": source,
+            credit = source_meta.get("credit") or f"{match_text} ({source}; {license_name})"
+            if source_meta.get("attribution_required") or license_status == "allowed_attribution" \
+                    or source in ("Pexels", "Pixabay"):
+                attributions.append(credit)
+            a = {"path": dest, "kind": kind, "title": match_text, "reused": False, "source": source,
                  "asset_id": uid, "source_url": source_meta.get("asset_page", url),
                  "license": license_name, "license_url": license_url,
                  "license_status": license_status, "illustrative": source in ("Pexels", "Pixabay"),
-                 "credit": credit}
+                 "credit": credit, "creator": source_meta.get("creator", ""),
+                 "attribution_required": source_meta.get("attribution_required", license_status == "allowed_attribution"),
+                 "authenticity": source_meta.get("authenticity", "topic_matched_illustrative"),
+                 "visual_role": source_meta.get("visual_role", "general"),
+                 "mood_fit": source_meta.get("mood_fit", 0.5),
+                 "verified_authentic": source_meta.get("verified_authentic", False),
+                 "restrictions": source_meta.get("restrictions", []),
+                 "width": source_meta.get("width", 0), "height": source_meta.get("height", 0),
+                 "duration": source_meta.get("duration", 0), "quality_score": source_meta.get("quality_score", 0),
+                 "download_date": source_meta.get("download_date", ""),
+                 # Coverr returns signed URLs tied to the API key; use only in memory for the download.
+                 "direct_url": "" if source == "Coverr" else url,
+                 "file_size_bytes": download_info.get("size_bytes",
+                    dest.stat().st_size if dest.exists() else 0)
+                 if isinstance(download_info, dict) else (dest.stat().st_size if dest.exists() else 0),
+                 "sha256": download_info.get("sha256", "") if isinstance(download_info, dict) else ""}
             a.update({"match_words": _words(q + " " + match_text),
                       "match_score": _score(q, match_text)})
+            _source_counts[source] = _source_counts.get(source, 0) + 1
+            visual_role = a.get("visual_role", "general")
+            _role_counts[visual_role] = _role_counts.get(visual_role, 0) + 1
             _all.append(a)
             return a
     return None
@@ -345,7 +327,8 @@ def _context_card(query, beat, setting, wd):
             "is_context_fallback": True}
 
 
-def gather_shot(q, alt, beat, setting, used, wd, wiki, wiki_cap=0.3, total_shots=100):
+def gather_shot(q, alt, beat, setting, used, wd, wiki, wiki_cap=0.3, total_shots=100,
+                mood="", topic="", historical_period="", scene_duration=0):
     """Find a semantically related asset or create a labeled context graphic."""
     bw = _words(beat)
     qwords = _words(q + " " + alt)
@@ -357,20 +340,27 @@ def gather_shot(q, alt, beat, setting, used, wd, wiki, wiki_cap=0.3, total_shots
                 _wiki_used[0] += 1
                 attributions.append(w["credit"])
                 credits.add("Wikimedia Commons")
+                _source_counts["Wikimedia Commons"] = _source_counts.get("Wikimedia Commons", 0) + 1
+                _role_counts["archive"] = _role_counts.get("archive", 0) + 1
                 return {"path": w["path"], "kind": "image", "reused": False, "source": "Wikimedia Commons",
                         "asset_id": w["asset_id"], "source_url": w["source_url"],
                         "license": w["license"], "license_url": w["license_url"],
                         "license_status": w["license_status"], "illustrative": False,
                         "credit": w["credit"],
+                        "authenticity": "topic_matched_illustrative",
+                        "verified_authentic": False,
                         "match_words": w["words"], "match_score": len(w["words"] & target)}
     setting_q = " ".join((setting or "").split()[:5])
+    context = {"topic": topic, "scene_description": " ".join((q, beat)), "story_beat": beat,
+               "location": setting, "historical_period": historical_period,
+               "mood": mood, "scene_duration": scene_duration}
     queries = list(dict.fromkeys(x for x in (q, alt, setting_q) if x))
     # First prefer direct text/tag matches, then lower-confidence matches that still share a term.
     for query in queries:
-        a = _try(_stock(query, False), query, used, wd, 1)
+        a = _try(_stock(query, False, context), query, used, wd, 1)
         if a:
             return a
-        a = _try(_stock(query, True), query, used, wd, 1)
+        a = _try(_stock(query, True, context), query, used, wd, 1)
         if a:
             return a
     for query in (q, alt):
@@ -379,7 +369,13 @@ def gather_shot(q, alt, beat, setting, used, wd, wiki, wiki_cap=0.3, total_shots
             if a:
                 return a
     if q or alt:
-        a = _try(_archive(q or alt), q or alt, used, wd, 1)
+        archive_query = " ".join(x for x in (q or alt, setting_q) if x)
+        a = _try(_archive(archive_query), q or alt, used, wd, 1)
+        if a:
+            return a
+    coverr_query = q or alt
+    if coverr_query:
+        a = _try(_coverr(coverr_query, context), coverr_query, used, wd, 1)
         if a:
             return a
     # Reuse only an asset whose indexed terms overlap this shot; otherwise show a contextual graphic.
@@ -397,5 +393,23 @@ def credit_line():
     src = ", ".join(sorted(credits)) or "no external footage"
     line = f"Visual sources: {src}."
     if attributions:
-        line += "\nPhotos: " + "; ".join(dict.fromkeys(attributions))[:1500] + " - via Wikimedia Commons."
+        line += "\nMedia credits: " + "; ".join(dict.fromkeys(attributions))[:1200]
     return line
+
+
+def write_credit_files(assets, directory):
+    """Write structured and human-readable credits for the documentary build."""
+    import json
+    from pathlib import Path
+    rows = research_credits(assets)
+    directory = Path(directory)
+    json_path = directory / "media_credits.json"
+    text_path = directory / "media_credits.txt"
+    json_path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    lines = ["Documentary media credits", ""]
+    for row in rows:
+        lines.append(f"- {row['title'] or row['asset_id']} — {row['creator'] or 'Creator not listed'} — "
+                     f"{row['source']} — {row['license']} [{row['license_status']}] — "
+                     f"{row['attribution'] or row['original_url']}")
+    text_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return json_path, text_path

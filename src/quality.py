@@ -20,12 +20,12 @@ def validate_ass(path, duration, min_events=8):
     path = Path(path)
     if not path.is_file() or path.stat().st_size < 100:
         return ["subtitle file missing or empty"]
-    events = []
+    events, captions = [], []
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.startswith("Dialogue:"):
             continue
-        parts = line.split(",", 3)
-        if len(parts) < 3:
+        parts = line.split(",", 9)
+        if len(parts) < 4:
             return ["malformed subtitle event"]
         try:
             start, end = _seconds(parts[1]), _seconds(parts[2])
@@ -34,9 +34,66 @@ def validate_ass(path, duration, min_events=8):
         if start < 0 or end <= start or end > duration + 1.0:
             return ["subtitle event outside video duration"]
         events.append((start, end))
+        if parts[3].strip() == "Main":
+            captions.append((start, end))
     if len(events) < min_events:
         return ["subtitle events missing"]
+    if not captions:
+        return ["narration captions missing"]
+    captions.sort()
+    if captions[0][0] > min(1.5, duration * 0.1):
+        return ["narration subtitles start too late"]
+    if captions[-1][1] < duration - min(2.0, duration * 0.08):
+        return ["narration subtitles end too early"]
+    if any(current[0] < previous[1] - 0.02
+           for previous, current in zip(captions, captions[1:])):
+        return ["narration subtitle events overlap"]
+    covered, start, end = 0.0, *captions[0]
+    for next_start, next_end in captions[1:]:
+        if next_start <= end:
+            end = max(end, next_end)
+        else:
+            covered += end - start
+            start, end = next_start, next_end
+    covered += end - start
+    if covered / max(duration, 0.001) < 0.5:
+        return ["narration subtitle timing covers too little of the video"]
     return []
+
+
+def validate_story_media(scenes, durations, plans, assets_by_scene):
+    """Check actual scene pacing, narration continuity and visual reuse as one plan."""
+    scenes, durations = list(scenes or []), list(durations or [])
+    plans, assets_by_scene = list(plans or []), list(assets_by_scene or [])
+    issues = []
+    if not scenes or len(scenes) != len(durations) or len(scenes) != len(plans) \
+            or len(scenes) != len(assets_by_scene):
+        return ["scene, narration, footage and edit plans are misaligned"]
+    prior_narration, prior_visuals = None, set()
+    for index, (scene, duration, shot_plan, assets) in enumerate(
+            zip(scenes, durations, plans, assets_by_scene), 1):
+        try:
+            duration = float(duration)
+            shot_total = sum(float(value) for value in shot_plan)
+        except (TypeError, ValueError):
+            issues.append(f"scene {index} has invalid timing")
+            continue
+        if duration <= 0 or abs(duration - shot_total) > 0.15:
+            issues.append(f"scene {index} shot pacing does not match its narration duration")
+        if len(shot_plan) != len(assets) or not assets:
+            issues.append(f"scene {index} footage does not cover every planned shot")
+        narration = " ".join(str(scene.get("narration", "")).lower().split())
+        if not narration:
+            issues.append(f"scene {index} has no narration")
+        elif narration == prior_narration:
+            issues.append(f"scene {index} repeats the previous narration")
+        prior_narration = narration
+        visual_ids = {str(asset.get("asset_id") or asset.get("path")) for asset in assets}
+        repeated = visual_ids & prior_visuals
+        if repeated:
+            issues.append(f"scene {index} repeats a visual used in the previous scene")
+        prior_visuals = visual_ids
+    return list(dict.fromkeys(issues))
 
 
 def validate_thumbnail(path, expected_size=(1280, 720), min_bytes=10_000):
@@ -100,7 +157,7 @@ def validate_video(path, expected_duration=None, portrait=False, min_bytes=1 << 
     scan = subprocess.run(
         ["ffmpeg", "-hide_banner", "-nostats", "-v", "info", "-i", str(path),
          "-vf", "blackdetect=d=3:pix_th=0.08,freezedetect=n=-60dB:d=8",
-         "-af", "astats=metadata=1:reset=0", "-f", "null", "-"],
+         "-af", "astats=metadata=1:reset=0,volumedetect", "-f", "null", "-"],
         capture_output=True, text=True, timeout=900)
     if scan.returncode:
         issues.append("full-file FFmpeg decode failed")
@@ -119,4 +176,10 @@ def validate_video(path, expected_duration=None, portrait=False, min_bytes=1 << 
         issues.append("audio peak is at or above -0.05 dBFS (clipping risk)")
     if not peaks:
         issues.append("audio peak analysis did not produce a result")
+    means = re.findall(r"mean_volume:\s*(-?[0-9.]+|-inf)\s*dB", log, flags=re.I)
+    if not means:
+        issues.append("audio mean-level analysis did not produce a result")
+    elif any(value.lower() == "-inf" or float(value) < -45.0 or float(value) > -6.0
+             for value in means):
+        issues.append("audio mean level is outside the usable balance range (-45 to -6 dBFS)")
     return issues

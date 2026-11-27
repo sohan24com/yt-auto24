@@ -1,5 +1,6 @@
-import random, re, subprocess
+import hashlib, json, os, random, re, subprocess
 from pathlib import Path
+from .checkpoints import atomic_json, fingerprint
 
 FPS = 30
 GRADE = "eq=contrast=1.1:saturation=1.1:brightness=-0.03:gamma_r=1.04:gamma_b=0.96,vignette=PI/5"   # warm highlights / cool shadows, cheap to render
@@ -10,6 +11,15 @@ def run(cmd, cwd=None):
     r = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
     if r.returncode:
         raise RuntimeError("ffmpeg failed:\n" + r.stderr[-1500:])
+
+
+def _run_video_atomic(cmd, out, cwd=None):
+    out = Path(out)
+    partial = out.with_name(out.stem + ".partial" + out.suffix)
+    command = list(cmd)
+    command[-1] = str(partial)
+    run(command, cwd=cwd)
+    os.replace(partial, out)
 
 
 def plan_shots(d, fast=0.0):
@@ -65,7 +75,7 @@ def render_shot(asset, d, out, n, punch=False, camera_movement=""):
             vf = (f"scale=2400:1350:force_original_aspect_ratio=increase,crop=2400:1350,fps={FPS},"
                   f"zoompan=z='{z}':x='{x}':y='{y}':d=1:"
                   f"s=1920x1080:fps={FPS},{GRADE}")
-        run(["ffmpeg", "-y", "-stream_loop", "-1", "-i", p, "-t", f"{d}", "-vf", vf, *X264, str(out)])
+        _run_video_atomic(["ffmpeg", "-y", "-stream_loop", "-1", "-i", p, "-t", f"{d}", "-vf", vf, *X264, str(out)], out)
     else:
         frame_count = int(float(d) * FPS) + 2
         step = (0.5 if punch else 0.35) / frame_count
@@ -78,11 +88,17 @@ def render_shot(asset, d, out, n, punch=False, camera_movement=""):
         x, y = _pan_position(camera_movement, frame_count)
         vf = (f"scale=2400:1350:force_original_aspect_ratio=increase,crop=2400:1350,"
               f"zoompan=z='{z}':x='{x}':y='{y}':d={frame_count}:s=1920x1080:fps={FPS},{GRADE}")
-        run(["ffmpeg", "-y", "-i", p, "-t", f"{d}", "-vf", vf, *X264, str(out)])
+        _run_video_atomic(["ffmpeg", "-y", "-i", p, "-t", f"{d}", "-vf", vf, *X264, str(out)], out)
 
 def ass_time(t):
     h, m, s = int(t // 3600), int(t % 3600 // 60), t % 60
     return f"{h}:{m:02d}:{s:05.2f}"
+
+
+def _ass_text(value):
+    """Remove user/model-controlled ASS override syntax from displayed text."""
+    value = str(value or "").replace("\\", "／").replace("{", "(").replace("}", ")")
+    return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", value)
 
 
 def make_ass(scenes, durs, path, hook_text="", shot_labels=None):
@@ -103,7 +119,7 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
 """
     lines, t0 = [], 0.0
     for s, d in zip(scenes, durs):
-        words = re.sub(r"\s+", " ", s["narration"]).strip().split(" ")
+        words = re.sub(r"\s+", " ", _ass_text(s["narration"])).strip().split(" ")
         chunks, cur = [], []
         for w in words:
             cur.append(w)
@@ -133,7 +149,7 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
         t0 += d
     # kinetic hook title (first seconds) + chapter labels at each scene start
     if hook_text.strip():
-        words = hook_text.upper().split()
+        words = _ass_text(hook_text).upper().split()
         k = (len(words) + 1) // 2 if len(words) > 2 else len(words)
         txt = " ".join(words[:k]) + ("\\N" + " ".join(words[k:]) if words[k:] else "")
         lines.append(f"Dialogue: 1,{ass_time(0.25)},{ass_time(5.0)},Hook,,0,0,0,,"
@@ -141,10 +157,10 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
     t0 = 0.0
     for i, (sc, d) in enumerate(zip(scenes, durs)):
         if i > 0:
-            title = sc.get("title", "").upper().replace("{", "(").replace("}", ")")
+            title = _ass_text(sc.get("title", "")).upper()
             plan = sc.get("visual_plan", {})
             animation = str(plan.get("animation", "")).lower() if isinstance(plan, dict) else ""
-            reveal = str(sc.get("information_reveal", "")).strip()
+            reveal = _ass_text(sc.get("information_reveal", "")).strip()
             label = f"{i + 1:02d}  |  {title}"
             if reveal and any(word in animation for word in ("label", "text", "graphic", "diagram", "callout")):
                 short_reveal = " ".join(reveal.split()[:6]).upper().replace("{", "(").replace("}", ")")
@@ -155,10 +171,10 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
                          + f"{{\\fad({fade_in},500)}}{label}")
         t0 += d
     for start, end, label in (shot_labels or []):
-        safe = str(label).replace("{", "(").replace("}", ")")
+        safe = _ass_text(label)
         if safe:
             lines.append(f"Dialogue: 2,{ass_time(start)},{ass_time(end)},Source,,0,0,0,,{safe}")
-    Path(path).write_text(head + "\n".join(lines) + "\n")
+    Path(path).write_text(head + "\n".join(lines) + "\n", encoding="utf-8")
 
 
 CHORDS = [[110.0, 130.81, 164.81, 220.0, 261.63, 329.63],    # Am
@@ -314,22 +330,37 @@ def _source_label(asset):
     return f"ILLUSTRATIVE • {source.upper()}" if source else "ILLUSTRATIVE"
 
 
-def assemble(scenes, durs, plans, assets_by_scene, voice, wd, out, hook_text=""):
-    """Render every shot, label sources, burn captions, and mix sound design."""
+def prepare_edit(scenes, durs, plans, assets_by_scene, voice, wd, hook_text="",
+                 progress_fingerprint=""):
+    """Prepare shots, captions and sound mix; reuse hash-verified shots after interruption."""
     wd = Path(wd)
     shots, n, clock = [], 0, 0.0
     shot_labels = []
+    progress_path = wd / "edit-progress.json"
+    try:
+        progress = json.loads(progress_path.read_text(encoding="utf-8"))
+        if progress.get("fingerprint") != progress_fingerprint:
+            progress = {"fingerprint": progress_fingerprint, "shots": {}}
+    except (OSError, ValueError, AttributeError):
+        progress = {"fingerprint": progress_fingerprint, "shots": {}}
     for scene, plan, assets in zip(scenes, plans, assets_by_scene):
         visual_plan = scene.get("visual_plan", {})
         movement = visual_plan.get("camera_movement", "") if isinstance(visual_plan, dict) else ""
         for l, a in zip(plan, assets):
             o = wd / f"shot{n:04d}.mp4"
-            render_shot(a, l, o, n, punch=clock < 10.0, camera_movement=movement)      # push-in on every shot of the cold open
+            signature = fingerprint({"source_sha256": _sha256(a["path"]), "duration": l, "index": n,
+                                     "punch": clock < 10.0, "camera_movement": movement})
+            cached = progress.get("shots", {}).get(o.name, {})
+            if (cached.get("signature") != signature or not o.is_file()
+                    or cached.get("sha256") != _sha256(o)):
+                render_shot(a, l, o, n, punch=clock < 10.0, camera_movement=movement)
+                progress.setdefault("shots", {})[o.name] = {"signature": signature, "sha256": _sha256(o)}
+                atomic_json(progress_path, progress)
             shots.append(o)
             shot_labels.append((clock, clock + l, _source_label(a)))
             clock += l
             n += 1
-    (wd / "shots.txt").write_text("".join(f"file '{s.name}'\n" for s in shots))
+    (wd / "shots.txt").write_text("".join(f"file '{s.name}'\n" for s in shots), encoding="utf-8")
     total = sum(durs)
     starts, t = [], 0.0
     for d in durs:
@@ -341,8 +372,33 @@ def assemble(scenes, durs, plans, assets_by_scene, voice, wd, out, hook_text="")
     make_impact(wd / "impact.wav")
     mix_audio(voice, wd / "music.wav", wd / "whoosh.wav", wd / "impact.wav",
               starts[1:], total, wd / "mix.wav", scenes=scenes, scene_starts=starts)
+    atomic_json(wd / "edit-stage.json", {"starts": starts, "shot_labels": shot_labels,
+                                         "total_duration": total, "shot_count": len(shots)})
+    return starts
+
+
+def _sha256(path):
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def render_prepared(wd, out, total):
+    """Encode the prepared shot list, subtitles and audio mix to the final MP4."""
+    wd = Path(wd)
+    out = Path(out)
+    partial = out.with_name(out.stem + ".partial" + out.suffix)
     run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "shots.txt", "-i", "mix.wav",
          "-vf", "subtitles=subs.ass", "-map", "0:v", "-map", "1:a",      # no fade-in: the video starts on a hit
          "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p",
-         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-t", f"{total:.2f}", str(out)], cwd=wd)
+         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-t", f"{total:.2f}", str(partial)], cwd=wd)
+    os.replace(partial, out)
+
+
+def assemble(scenes, durs, plans, assets_by_scene, voice, wd, out, hook_text=""):
+    """Compatibility wrapper around the restartable edit and render stages."""
+    starts = prepare_edit(scenes, durs, plans, assets_by_scene, voice, wd, hook_text)
+    render_prepared(wd, out, sum(durs))
     return starts

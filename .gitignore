@@ -1,4 +1,6 @@
 __pycache__/
+.media-cache/
+.ffmpeg-test/
 client_secret*.json
 *.pyc
 tools/.youtube_refresh_token

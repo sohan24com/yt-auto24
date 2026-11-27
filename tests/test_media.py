@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from contextlib import ExitStack
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -42,13 +43,16 @@ class PipelineTests(unittest.TestCase):
         return SimpleNamespace(status_code=status, text=text, json=lambda: payload)
 
     def _gemini_test_env(self):
-        return patch.dict(os.environ, {
+        stack = ExitStack()
+        stack.enter_context(patch.dict(os.environ, {
             "GEMINI_API_KEY": "test-key-1",
             "GEMINI_API_KEY_2": "test-key-2",
             "GEMINI_API_KEY_3": "",
             "GEMINI_API_KEY_4": "",
             "GEMINI_API_KEY_5": "",
-        }, clear=False)
+        }, clear=False))
+        stack.enter_context(patch("src.common._GEMINI_PAUSED_REASON", None))
+        return stack
 
     def test_model_list_only_uses_free_tier_text_models(self):
         common._MODELS = None
@@ -71,7 +75,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(["gemini-3.6-flash", "gemini-2.5-flash-lite"], models)
         common._MODELS = None
 
-    def test_gemini_falls_back_to_groq_after_all_gemini_keys_fail(self):
+    def test_gemini_stops_at_quota_and_falls_back_to_groq(self):
         gemini_quota = self._gemini_response(429, text="quota")
         groq_rejected = self._gemini_response(401, text="invalid key")
         groq_success = SimpleNamespace(
@@ -86,7 +90,7 @@ class PipelineTests(unittest.TestCase):
             }, clear=False),
             patch("src.common._model_list", return_value=["gemini-model"]),
             patch("src.common.requests.post", side_effect=[
-                gemini_quota, gemini_quota, groq_rejected, groq_success,
+                gemini_quota, groq_rejected, groq_success,
             ]) as post,
         ):
             result = common.gemini("test prompt", request_timeout=1, total_timeout=5)
@@ -111,7 +115,6 @@ class PipelineTests(unittest.TestCase):
             }, clear=False),
             patch("src.common._model_list", return_value=["gemini-model"]),
             patch("src.common.requests.post", side_effect=[
-                self._gemini_response(429, text="quota"),
                 self._gemini_response(429, text="quota"),
                 groq_quota, groq_success,
             ]) as post,
@@ -138,18 +141,15 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual({"ok": True}, result)
         self.assertTrue(groq.call_args.kwargs["grounding"])
 
-    def test_gemini_rotates_to_next_key_on_quota(self):
-        success = {"candidates": [{"content": {"parts": [{"text": '{"ok": true}'}]}}]}
+    def test_gemini_stops_key_rotation_on_quota(self):
         with self._gemini_test_env(), \
              patch("src.common._model_list", return_value=["model-a"]), \
-             patch("src.common.requests.post", side_effect=[
-                 self._gemini_response(429, text="quota"),
-                 self._gemini_response(200, success),
-             ]) as post:
-            result = common.gemini("test prompt", request_timeout=1, total_timeout=5)
-        self.assertTrue(result["ok"])
-        self.assertEqual(["test-key-1", "test-key-2"],
-                         [call.kwargs["params"]["key"] for call in post.call_args_list])
+             patch("src.common.requests.post", return_value=self._gemini_response(429, text="quota")) as post:
+            with self.assertRaises(common.GeminiUnavailableError) as error:
+                common.gemini("test prompt", request_timeout=1, total_timeout=5)
+        self.assertEqual(1, post.call_count)
+        self.assertEqual("test-key-1", post.call_args.kwargs["params"]["key"])
+        self.assertIn("HTTP 429 x1", str(error.exception))
 
     def test_gemini_moves_to_next_model_on_capacity_error(self):
         success = {"candidates": [{"content": {"parts": [{"text": '{"ok": true}'}]}}]}
@@ -166,14 +166,14 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual("test-key-1", post.call_args_list[1].kwargs["params"]["key"])
 
     def test_gemini_exhaustion_is_bounded_and_descriptive(self):
-        failures = [self._gemini_response(403, text="free tier unavailable") for _ in range(4)]
         with self._gemini_test_env(), \
              patch("src.common._model_list", return_value=["model-a", "model-b"]), \
-             patch("src.common.requests.post", side_effect=failures) as post:
+             patch("src.common.requests.post", return_value=self._gemini_response(403, text="free tier unavailable")) as post:
             with self.assertRaises(common.GeminiUnavailableError) as error:
                 common.gemini("test prompt", request_timeout=1, total_timeout=5)
-        self.assertEqual(4, post.call_count)
-        self.assertIn("HTTP 403 x4", str(error.exception))
+        self.assertEqual(1, post.call_count)
+        self.assertIn("HTTP 403 x1", str(error.exception))
+        self.assertIn("project permission or free-tier access", str(error.exception))
 
     def test_footage_candidate_match_metadata_uses_candidate_text(self):
         footage.reset()
@@ -198,6 +198,9 @@ class PipelineTests(unittest.TestCase):
             script.write_script({"topic": "Test topic", "angle": "A real question"},
                                 validation_feedback=["5-second hook too long"])
         self.assertIn("5-second hook too long", gemini_call.call_args.args[0])
+        self.assertIn('"hook_text":""', gemini_call.call_args.args[0])
+        self.assertIn("at least 100 narration words; hard maximum 300", gemini_call.call_args.args[0])
+        self.assertIn("visual_anchor must be 1-3 concrete words", gemini_call.call_args.args[0])
 
     def test_ffprobe_missing_stream_durations_fall_back_to_container(self):
         output = {

@@ -43,6 +43,151 @@ def _scene_map(blueprint):
     return result
 
 
+def align_visual_anchors(blueprint):
+    """Repair a scene anchor using only words in its narration and existing visuals."""
+    if not isinstance(blueprint, dict) or not isinstance(blueprint.get("scenes"), list):
+        return blueprint
+    result = dict(blueprint)
+    scenes = []
+    for original in blueprint["scenes"]:
+        if not isinstance(original, dict):
+            scenes.append(original)
+            continue
+        scene = dict(original)
+        raw_plan = scene.get("visual_plan")
+        plan = dict(raw_plan) if isinstance(raw_plan, dict) else {}
+        raw_keywords = plan.get("footage_keywords", [])
+        existing_keywords = raw_keywords if isinstance(raw_keywords, list) else []
+        narration = str(scene.get("narration", ""))
+        narration_order = [word.lower() for word in re.findall(r"[A-Za-z0-9']+", narration)
+                           if len(word) > 2 and word.lower() not in STOP]
+        narration_terms = set(narration_order)
+        visual_text = " ".join((str(plan.get("description", "")),
+                                " ".join(str(value) for value in existing_keywords
+                                         if isinstance(value, str))))
+        shared = narration_terms & _tokens(visual_text)
+
+        # A draft's existing stock-search options are valid repair material too.
+        if not shared:
+            options = scene.get("visuals", [])
+            scored = []
+            if isinstance(options, list):
+                for phrase in options:
+                    phrase_terms = narration_terms & _tokens(phrase)
+                    if phrase_terms:
+                        scored.append((len(phrase_terms), str(phrase), phrase_terms))
+            if scored:
+                _, phrase, shared = max(scored, key=lambda row: (row[0], row[1]))
+                description = str(plan.get("description", "")).strip()
+                if phrase.casefold() not in description.casefold():
+                    plan["description"] = (description + " | visual target: " + phrase).strip(" |")
+                keywords = list(existing_keywords)
+                for word in re.findall(r"[A-Za-z0-9'-]+", phrase):
+                    if word.lower() in shared and word not in keywords:
+                        keywords.append(word)
+                plan["footage_keywords"] = keywords[:8]
+
+        current_anchor = _tokens(scene.get("visual_anchor", ""))
+        if not shared:
+            # If the model supplied an entirely unrelated visual, use a short phrase
+            # already spoken in the scene and label the planned shot as illustrative.
+            # This creates no new documentary claim or assertion of authenticity.
+            visual_verbs = {"about", "after", "before", "become", "became", "being", "change", "changed",
+                            "explain", "explains", "explained", "find", "finds", "found", "show", "shows",
+                            "showed", "tell", "tells", "told", "think", "thought", "use", "used", "using",
+                            "make", "made", "create", "created", "discover", "discovers", "discovered",
+                            "reveal", "reveals", "revealed", "researcher", "researchers", "scientist",
+                            "scientists", "historian", "historians", "according", "perhaps", "likely",
+                            "might", "could", "would", "therefore", "however"}
+            candidates = [word for word in narration_order if word not in visual_verbs]
+            chosen = candidates[:3]
+            if chosen:
+                shared = set(chosen)
+                phrase = " ".join(chosen)
+                description = str(plan.get("description", "")).strip()
+                plan["description"] = (description + " | illustrative, narration-derived visual target: " + phrase).strip(" |")
+                keywords = list(existing_keywords)
+                for word in chosen:
+                    if word not in keywords:
+                        keywords.append(word)
+                plan["footage_keywords"] = keywords[:8]
+                options = scene.get("visuals", [])
+                options = list(options) if isinstance(options, list) else []
+                if not any(phrase.casefold() == str(value).strip().casefold() for value in options):
+                    scene["visuals"] = [phrase, *options[:3]]
+
+        current_anchor = _tokens(scene.get("visual_anchor", ""))
+        if shared and (not current_anchor or not current_anchor <= shared):
+            chosen = []
+            for word in narration_order:
+                if word in shared and word not in chosen:
+                    chosen.append(word)
+                if len(chosen) == 3:
+                    break
+            scene["visual_anchor"] = " ".join(chosen)
+        scene["visual_plan"] = plan
+        scenes.append(scene)
+    result["scenes"] = scenes
+    return result
+
+
+def reconcile_loop_references(blueprint):
+    """Align declared loop locations to explicit scene markers without inventing payoffs."""
+    if not isinstance(blueprint, dict) or not isinstance(blueprint.get("scenes"), list):
+        return blueprint
+    result = dict(blueprint)
+    scenes = [dict(scene) if isinstance(scene, dict) else scene for scene in blueprint["scenes"]]
+    result["scenes"] = scenes
+    scene_by_number = {}
+    for index, scene in enumerate(scenes, 1):
+        if not isinstance(scene, dict):
+            continue
+        try:
+            number = int(scene.get("number", index))
+        except (TypeError, ValueError):
+            continue
+        scene_by_number[number] = scene
+    loops = result.get("open_loops")
+    if not isinstance(loops, list):
+        return result
+    normalized = []
+    for loop in loops:
+        if not isinstance(loop, dict):
+            normalized.append(loop)
+            continue
+        row = dict(loop)
+        loop_id = str(row.get("id", "")).strip()
+        try:
+            opened = int(row.get("opened_scene"))
+        except (TypeError, ValueError):
+            normalized.append(row)
+            continue
+        opening_markers = [number for number, scene in scene_by_number.items()
+                           if loop_id in (scene.get("opens_loop") or [])]
+        if opening_markers:
+            opened = min(opening_markers)
+            row["opened_scene"] = opened
+            for number, scene in scene_by_number.items():
+                scene["opens_loop"] = [item for item in (scene.get("opens_loop") or [])
+                                        if item != loop_id or number == opened]
+
+        try:
+            payoff = int(row.get("payoff_scene"))
+        except (TypeError, ValueError):
+            payoff = None
+        payoff_markers = sorted(number for number, scene in scene_by_number.items()
+                                if loop_id in (scene.get("pays_off") or []) and number > opened)
+        if payoff_markers:
+            payoff = payoff_markers[0]
+            row["payoff_scene"] = payoff
+            for number, scene in scene_by_number.items():
+                scene["pays_off"] = [item for item in (scene.get("pays_off") or [])
+                                     if item != loop_id or number == payoff]
+        normalized.append(row)
+    result["open_loops"] = normalized
+    return result
+
+
 def evidence_dossier(record):
     """Convert Phase 2 evidence rows to stable IDs consumable by scene plans."""
     rows = record.get("claims", []) if isinstance(record, dict) else []
@@ -57,6 +202,8 @@ def evidence_dossier(record):
             "evidence": str(row.get("evidence", "")),
             "source": str(row.get("source", "")),
             "url": str(row.get("source_url", "")),
+            "sources": list(row.get("sources", [])),
+            "conflicts": list(row.get("conflicts", [])),
             "confidence": str(row.get("confidence", "unrated")),
             "status": "supported_with_uncertainty" if str(row.get("confidence", "")).lower() == "low"
                       else "search_linked_pending_editorial_review",

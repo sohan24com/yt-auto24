@@ -35,6 +35,20 @@ publishing:
   require_search_linked_fact_check: true
   require_license_manifest: true
 
+research:
+  min_independent_sources_per_claim: 2
+  min_scenes_with_evidence: 8
+
+media:
+  cache_dir: ".media-cache"
+  cache_ttl_seconds: 86400
+  cache_max_mb: 16
+  asset_cache_ttl_days: 7
+  asset_cache_max_mb: 512
+  max_download_mb: 90
+  search_result_limit_per_source: 8
+  coverr_max_searches_per_build: 12
+
 youtube:
   privacy: "public"     # becomes forced-private until your API project passes Google's audit
   category_id: "27"     # Education

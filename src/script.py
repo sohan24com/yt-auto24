@@ -1,15 +1,35 @@
 from .common import cfg, gemini, load_insights
+from .open_learning import prompt_skills
 
 
 def words(scenes):
     return sum(len(s["narration"].split()) for s in scenes)
 
 
-def write_script(topic, validation_feedback=None):
+def write_script(topic, validation_feedback=None, previous_draft=None):
     c = cfg()
     v = c["video"]
     lessons = "\n".join("- " + l for l in load_insights().get("lessons", []))
+    skills = topic.get("learning_skills") or prompt_skills()
+    skill_notes = "\n".join(
+        f"- [{item.get('status', 'candidate')}; confidence {float(item.get('confidence') or 0):.2f}] "
+        f"{item.get('principle', '')} Source: {item.get('source_title', '')} "
+        f"({item.get('source_url', '')}); license: {item.get('license', 'unknown')}."
+        for item in skills if item.get("principle") and item.get("source_url")
+    )
+    research_sources = [row for row in (topic.get("open_research_sources") or [])
+                        if row.get("url") and row.get("status") != "temporarily_unavailable"]
+    source_notes = "\n".join(
+        f"- {row.get('source')}: {row.get('title')} — {row.get('url')} "
+        f"(rights: {row.get('license', 'unknown')}; status: {row.get('status', 'review required')})"
+        for row in research_sources[:12]
+    )
     feedback = "\n".join("- " + str(p) for p in (validation_feedback or [])) or "- none"
+    target_total = (int(v["words_min"]) + int(v["words_max"])) // 2
+    minimum_total, maximum_total = int(v["words_min"]), int(v["words_max"])
+    progression_budget = max(8, round((target_total - 38) / 16))
+    per_scene_min = max(8, round((minimum_total - 42) / 16))
+    per_scene_max = max(per_scene_min, round((maximum_total - 26) / 16))
     prompt = f"""Write a rigorous 8-10 minute English documentary narration using one evidence-led story blueprint.
 Channel tone: {c['channel']['tone']}.
 Topic: {topic['topic']}
@@ -20,13 +40,21 @@ STORY CONTRACT
 - Scene 1 is a standalone cold-open hook: one truthful sentence, at most 12 words, no greeting, no channel intro.
   It must open a specific question answered later. It is the entire hook scene, not a paragraph that runs past five seconds.
 - The central_question, title_promise and opening narration must describe the same documented story.
+  Reuse at least two important title_promise words in the opening sentence, without making a claim
+  stronger than the evidence. Add hook_text: a truthful 3-5 word on-screen phrase drawn from that hook.
 - Act I establishes the object, stakes and investigation; Act II develops evidence and complications; Act III delivers the evidence-bounded answer, meaning and concise natural CTA.
 - Create 1-3 open loops, each with a unique ID, opening scene, question and a later explicit payoff scene before scene 18.
 - Every scene must move the story forward with new information, a reveal, an obstacle, a consequence or a payoff.
 - Plan 20-45 seconds of spoken progression for scenes 2-18. Put a target_duration_seconds estimate in each plan; actual audio timing is checked after voice generation.
 - Use a pattern interrupt only when it clarifies or changes the viewer's understanding; do not add empty spectacle.
 - Deliver a satisfying resolution in scene 17, then a brief thank-you/Like/Comment/Subscribe/related-next-video invitation in scene 18.
-- Total narration {v['words_min']}-{v['words_max']} words. Keep scene 1 under 12 words and distribute remaining narration across scenes 2-17.
+- NARRATION LENGTH IS A HARD CONSTRAINT: write at least {minimum_total} narration words; hard maximum {maximum_total};
+  aim for {target_total}. Count only spoken narration. Do not stop early.
+  Scene 1 must be one standalone sentence of 6-12 words. Scene 18 should be a concise 20-30 word outro.
+  Each of scenes 2-17 needs roughly {per_scene_min}-{per_scene_max} spoken words (aim for about
+  {progression_budget} each). Add evidence-backed context, causal explanation, uncertainty and payoffs;
+  do not pad or repeat. A scene with fewer than 8 narration words is invalid. Count narration only,
+  not storyboard fields.
 
 EVIDENCE AND HONESTY
 - Facts must be checkable and linked to research; distinguish observed evidence, published interpretation, hypothesis and unknown.
@@ -43,16 +71,40 @@ description, camera_movement, footage_keywords (at least 2 concrete terms), anim
 music_mood and transition.
 Clearly mark archival evidence vs illustrative/reconstructed imagery in visual descriptions. No unrelated visuals.
 
+IMPORTANT VALIDATION RULES:
+- Include every required root and scene field in the JSON schema below, especially hook_text.
+- visual_anchor must be 1-3 concrete words/short phrase copied verbatim from BOTH that scene's narration
+  and its visual_plan description or footage_keywords. Keep the planned visual tied to that narration.
+- Before returning JSON, count narration words and check the opening, all 18 scene lengths, title promise,
+  visual anchors, act labels, and loop payoffs against this contract.
+
 Return ONLY JSON:
-{{"central_question":"","title_promise":"","acts":[{{"name":"Act I — ...","scene_numbers":[1,2,3,4,5],"dramatic_question":""}},{{"name":"Act II — ...","scene_numbers":[6,7,8,9,10,11,12,13,14],"dramatic_question":""}},{{"name":"Act III — ...","scene_numbers":[15,16,17,18],"dramatic_question":""}}],
+{{"central_question":"","title_promise":"","hook_text":"","acts":[{{"name":"Act I — ...","scene_numbers":[1,2,3,4,5],"dramatic_question":""}},{{"name":"Act II — ...","scene_numbers":[6,7,8,9,10,11,12,13,14],"dramatic_question":""}},{{"name":"Act III — ...","scene_numbers":[15,16,17,18],"dramatic_question":""}}],
 "open_loops":[{{"id":"L1","question":"","opened_scene":1,"payoff_scene":8}}],
 "scenes":[{{"number":1,"act":1,"title":"","narration":"","story_purpose":"","story_progress":"","causal_link":"","visual_anchor":"","emotion":"","opens_loop":["L1"],"pays_off":[],"pattern_interrupt":"","information_reveal":"","target_duration_seconds":4,"evidence_ids":[],"visuals":["","","",""],"visual_plan":{{"description":"","camera_movement":"","footage_keywords":["",""],"animation":"","sound_effect":"","music_mood":"","transition":""}}}}]}}
 VALIDATION FEEDBACK FROM THE PREVIOUS DRAFT (correct each item):
 {feedback}
 Lessons from channel analytics (apply only when consistent with evidence):
-{lessons or '- none yet'}"""
+{lessons or '- none yet'}
+Open educational skill hypotheses (apply only when relevant; never copy source wording):
+{skill_notes or '- none available; do not invent learned skills'}
+Open research leads (leads only; every factual claim must be independently verified):
+{source_notes or '- no open-source leads currently available'}
+Open-access status is not by itself a license to reuse content. Do not scrape or copy YouTube creators.
+If feedback reports a word count, revise the narration materially to fit the hard limit; do not merely acknowledge it."""
+    if isinstance(previous_draft, dict):
+        import json
+        prompt += ("\n\nREPAIR THIS PREVIOUS DRAFT. Keep its researched subject, valid claims, evidence boundaries, "
+                   "and useful story structure. Rewrite narration and scene plans as needed to fix EVERY "
+                   "validation item above. Do not copy its failures or invent facts. Return the complete JSON.\n"
+                   "PREVIOUS DRAFT:\n" + json.dumps(previous_draft, ensure_ascii=False))
     result = gemini(prompt, temperature=0.75)
     if isinstance(result, dict):
+        from .story import align_visual_anchors, reconcile_loop_references
+        result = align_visual_anchors(result)
+        result = reconcile_loop_references(result)
+        if not str(result.get("hook_text", "")).strip() and result.get("scenes"):
+            result["hook_text"] = _hook_text(result["scenes"][0].get("narration", ""))
         result["story_schema_version"] = 1
         from .story import quality_score
         result["story_quality"] = quality_score(result, require_evidence=False)
@@ -61,25 +113,35 @@ Lessons from channel analytics (apply only when consistent with evidence):
 def fact_check(script):
     from .evidence import evidence_record, normalize_evidence
 
+    research = cfg().get("research", {})
+    minimum_sources = max(2, int(research.get("min_independent_sources_per_claim", 2)))
+    minimum_scenes = max(1, int(research.get("min_scenes_with_evidence", 8)))
     prompt = f"""You are a strict documentary fact-checker. Use the available live web-search tool.
-For every material factual claim, provide a claim-to-source record: scene number (1-based), exact claim,
-a concise supporting explanation grounded in the search result, source name, direct HTTPS source URL,
-and confidence (high/medium/low). Never invent a URL, publication, quote, or evidence.
-Correct errors; remove or qualify claims that search does not support. Keep the same scenes and story.
+For each scene's important factual claim, provide at least {minimum_sources} genuinely independent sources from different
+publisher domains. For each source return name, exact URL from the search results, concise claim-specific evidence,
+publication date when visible, and source reliability/type (primary record, peer-reviewed study, official source,
+or secondary reporting). Do not count syndications or mirrors as independent. Mark disagreements explicitly in a
+conflicts array with the competing accounts and dates; do not resolve a dispute by guessing. Never invent a URL,
+publication date, quote, evidence, or source reliability. Correct errors; remove or qualify unsupported claims.
+Keep the same scenes and story, but cite only links present in the provider's machine-readable search results.
 Return ONLY JSON with:
-{{"scenes":[...],"claims":[{{"scene":1,"claim":"","evidence":"","source":"","source_url":"https://...","confidence":"medium"}}],"changes":["..."]}}
-Include only claims actually checked using search; do not say that this is independent human verification.
+{{"scenes":[...],"claims":[{{"scene":1,"claim":"","sources":[{{"source":"","url":"https://...","evidence":"","publication_date":"","reliability":""}},{{"source":"","url":"https://...","evidence":"","publication_date":"","reliability":""}}],"conflicts":[],"confidence":"medium"}}],"changes":["..."]}}
+Include only claims actually checked using search; source URLs must exactly match search results. Automated corroboration
+is not independent human verification.
 
 SCRIPT:
 {script}"""
     try:
         out = gemini(prompt, grounding=True, temperature=0.2)
         scenes = out.get("scenes")
-        claims, reason = normalize_evidence(out, len(script.get("scenes", [])))
+        claims, reason = normalize_evidence(out, len(script.get("scenes", [])),
+                                            min_sources=minimum_sources, min_scenes=minimum_scenes)
         if (isinstance(scenes, list) and len(scenes) >= 8 and claims
                 and abs(len(scenes) - len(script.get("scenes", []))) <= 1):
             result = dict(out)
-            result["sources"] = list(dict.fromkeys(row["source_url"] for row in claims))
+            result["sources"] = list(dict.fromkeys(
+                source["url"] for row in claims for source in row.get("sources", [])
+            ))
             result["_fact_check"] = evidence_record(claims)
             return result
         reason = reason or "fact-check response has an incomplete scene structure"
@@ -111,7 +173,11 @@ def valid(script):
             problems.append("5-second hook too long (max 12 words in opening sentence)")
     hook = str(script.get("hook_text", "")).split()
     if not 3 <= len(hook) <= 5:
-        problems.append("hook_text must contain 3-5 words")
+        derived_hook = _hook_text(sc[0].get("narration", "")) if sc else ""
+        if derived_hook:
+            script["hook_text"] = derived_hook
+        else:
+            problems.append("hook_text must contain 3-5 words")
     if not sc or len(sc[-1].get("narration", "").split()) < 20:
         problems.append("missing documentary outro/payoff")
     if script.get("story_schema_version") == 1:
@@ -123,6 +189,17 @@ def valid(script):
             problems.append(f"story quality score {story_result['score']} is below {minimum}")
         script["story_quality"] = story_result
     return list(dict.fromkeys(problems))
+
+
+def _hook_text(narration):
+    """Make a short on-screen hook from words already spoken in the cold open."""
+    import re
+    stop = {"a", "an", "the", "and", "for", "from", "with", "what", "when", "where", "why", "how",
+            "was", "were", "that", "this", "into", "over", "after", "before", "did", "does"}
+    tokens = re.findall(r"[A-Za-z0-9'-]+", str(narration))
+    meaningful = [word for word in tokens if word.lower() not in stop]
+    chosen = meaningful[:5] if len(meaningful) >= 3 else tokens[:5]
+    return " ".join(chosen).upper() if len(chosen) >= 3 else ""
 
 
 def _fallback_terms(text, limit=4):

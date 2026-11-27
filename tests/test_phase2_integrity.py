@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 
 from PIL import Image
 
-from src import evidence, pipeline, quality, script, youtube
+from src import edit, evidence, pipeline, quality, script, youtube
 
 
 class EvidenceTests(unittest.TestCase):
@@ -17,16 +17,23 @@ class EvidenceTests(unittest.TestCase):
             {"scene": i, "claim": f"Documented event detail number {i}",
              "evidence": f"A source explains the documented event detail for scene {i}.",
              "source": "Public archive", "source_url": f"https://example.org/source/{i}",
+             "sources": [
+                 {"source": "Public archive", "url": f"https://example.org/source/{i}",
+                  "evidence": f"A source explains the documented event detail for scene {i}."},
+                 {"source": "University research", "url": f"https://research.example.net/paper/{i}",
+                  "evidence": f"Independent research supports the documented event detail for scene {i}."},
+             ],
              "confidence": "medium"}
             for i in range(1, 9)
         ]
-        rows, error = evidence.normalize_evidence({"claims": claims}, 8)
+        grounded = [{"url": source["url"]} for claim in claims for source in claim["sources"]]
+        rows, error = evidence.normalize_evidence({"claims": claims, "_grounding_sources": grounded}, 8)
         self.assertIsNone(error)
         self.assertEqual(8, len(rows))
 
     def test_missing_source_links_are_not_verified(self):
         rows, error = evidence.normalize_evidence(
-            {"claims": [{"scene": 1, "claim": "This is a material claim",
+            {"_grounding_sources": [], "claims": [{"scene": 1, "claim": "This is a material claim",
                          "evidence": "Some supporting explanation is present here.",
                          "source": "Unknown", "source_url": "http://example.org"}]}, 8)
         self.assertEqual([], rows)
@@ -46,14 +53,46 @@ class EvidenceTests(unittest.TestCase):
             {"scene": i, "claim": f"Documented event detail number {i}",
              "evidence": f"A source explains the documented event detail for scene {i}.",
              "source": "Public archive", "source_url": f"https://example.org/source/{i}",
+             "sources": [
+                 {"source": "Public archive", "url": f"https://example.org/source/{i}",
+                  "evidence": f"A source explains the documented event detail for scene {i}."},
+                 {"source": "University research", "url": f"https://research.example.net/paper/{i}",
+                  "evidence": f"Independent research supports the documented event detail for scene {i}."},
+             ],
              "confidence": "high"}
             for i in range(1, 9)
         ]
-        result = {"scenes": scenes, "claims": claims, "changes": []}
+        grounded = [{"url": source["url"]} for claim in claims for source in claim["sources"]]
+        result = {"scenes": scenes, "claims": claims, "changes": [], "_grounding_sources": grounded}
         with patch.object(script, "gemini", return_value=result):
             checked = script.fact_check({"scenes": scenes, "sources": []})
         self.assertEqual("search_linked", checked["_fact_check"]["status"])
         self.assertEqual(8, len(checked["_fact_check"]["claims"]))
+
+    def test_single_or_ungrounded_source_cannot_be_marked_verified(self):
+        claim = {"scene": 1, "claim": "A well-defined material claim exists here.",
+                 "sources": [{"source": "Archive", "url": "https://archive.example.org/record/1",
+                              "evidence": "This source explains a supported historical fact."}]}
+        rows, reason = evidence.normalize_evidence(
+            {"claims": [claim], "_grounding_sources": [{"url": "https://archive.example.org/record/1"}]}, 1)
+        self.assertEqual([], rows)
+        self.assertIn("two independent", reason)
+
+    def test_grounded_sources_require_two_domains_and_record_conflicts(self):
+        claim = {"scene": 1, "claim": "A well-defined material claim exists here.", "conflicts": ["Dates differ by one year."],
+                 "sources": [
+                     {"source": "Archive", "url": "https://archive.example.org/record/1",
+                      "evidence": "This source describes the event as occurring in year 1901."},
+                     {"source": "Research", "url": "https://research.example.net/paper/1",
+                      "evidence": "Independent research dates the documented event to year 1902."},
+                 ]}
+        result = {"claims": [claim],
+                  "_grounding_sources": [{"url": row["url"]} for row in claim["sources"]]}
+        rows, reason = evidence.normalize_evidence(result, 1)
+        self.assertIsNone(reason)
+        record = evidence.evidence_record(rows)
+        self.assertEqual("search_linked_conflict", record["status"])
+        self.assertEqual(1, record["conflict_count"])
 
 
 class QualityTests(unittest.TestCase):
@@ -63,6 +102,37 @@ class QualityTests(unittest.TestCase):
             path.write_text("Dialogue: 0,0:00:00.00,0:00:03.00,Main,,0,0,0,,Hello\n" * 8,
                             encoding="utf-8")
             self.assertIn("subtitle event outside video duration", quality.validate_ass(path, 1.5))
+
+    def test_ass_subtitles_must_cover_the_narration_window(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "subs.ass"
+            path.write_text("\n".join(
+                ["Dialogue: 0,0:00:04.00,0:00:05.00,Main,,0,0,0,,Late caption"] * 8),
+                encoding="utf-8")
+            self.assertIn("narration subtitles start too late", quality.validate_ass(path, 10))
+
+    def test_ass_text_cannot_inject_override_commands(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "captions.ass"
+            edit.make_ass([{"narration": r"Safe text {\\p1} malicious"}], [4.0], path,
+                          hook_text=r"Title {\\an7}")
+            content = path.read_text(encoding="utf-8")
+            self.assertNotIn(r"{\\p1}", content)
+            self.assertNotIn(r"{\\an7}", content)
+
+    def test_scene_qc_flags_repeated_visuals_and_narration(self):
+        scenes = [{"narration": "The same narration advances the evidence."},
+                  {"narration": "The same narration advances the evidence."}]
+        assets = [[{"asset_id": "same", "path": "one.png"}],
+                  [{"asset_id": "same", "path": "one.png"}]]
+        issues = quality.validate_story_media(scenes, [4, 4], [[4], [4]], assets)
+        self.assertIn("scene 2 repeats the previous narration", issues)
+        self.assertIn("scene 2 repeats a visual used in the previous scene", issues)
+
+    def test_scene_qc_rejects_misaligned_shot_timing(self):
+        issues = quality.validate_story_media(
+            [{"narration": "One supported claim."}], [5], [[3]], [[{"asset_id": "a"}]])
+        self.assertIn("scene 1 shot pacing does not match its narration duration", issues)
 
     def test_thumbnail_dimensions_are_checked(self):
         with tempfile.TemporaryDirectory() as td:

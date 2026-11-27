@@ -61,6 +61,7 @@ FREE_GEMINI_MODELS = (
 )
 
 _MODELS = None
+_GEMINI_PAUSED_REASON = None
 
 
 def _model_list(key):
@@ -94,6 +95,11 @@ class GeminiUnavailableError(RuntimeError):
 
 def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
            tries=None, request_timeout=90, total_timeout=300):
+    global _GEMINI_PAUSED_REASON
+    if _GEMINI_PAUSED_REASON:
+        raise GeminiUnavailableError(
+            f"Gemini paused for this run after {_GEMINI_PAUSED_REASON}"
+        )
     body = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {"maxOutputTokens": 32000},
@@ -142,14 +148,35 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
                     timeout=min(float(request_timeout), remaining),
                 )
                 if r.status_code == 200:
-                    parts = r.json()["candidates"][0]["content"]["parts"]
+                    response = r.json()
+                    candidate = response["candidates"][0]
+                    parts = candidate["content"]["parts"]
                     text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
-                    return extract_json(text) if json_out else text
+                    result = extract_json(text) if json_out else text
+                    if grounding and isinstance(result, dict):
+                        metadata = candidate.get("groundingMetadata") or {}
+                        result["_grounding_sources"] = [
+                            {"url": chunk.get("web", {}).get("uri", ""),
+                             "title": chunk.get("web", {}).get("title", "")}
+                            for chunk in metadata.get("groundingChunks", [])
+                            if isinstance(chunk, dict) and isinstance(chunk.get("web"), dict)
+                            and chunk["web"].get("uri")
+                        ]
+                        result["_grounding_queries"] = metadata.get("webSearchQueries", [])
+                    return result
 
                 status = int(r.status_code)
                 status_counts[status] = status_counts.get(status, 0) + 1
-                last = f"{model}: HTTP {status}"
-                print(f"Gemini candidate unavailable: {model} HTTP {status}")
+                kinds = {
+                    400: "request format or model configuration",
+                    401: "API key authentication",
+                    403: "project permission or free-tier access",
+                    404: "model or endpoint configuration",
+                    429: "quota or rate limit",
+                }
+                kind = kinds.get(status, "temporary service failure" if status >= 500 else "HTTP error")
+                last = f"{model}: HTTP {status} ({kind})"
+                print(f"Gemini candidate unavailable: HTTP {status} ({kind})")
 
                 if status == 503 or status in (500, 502, 504):
                     # Capacity errors are model-wide; move to another model instead of
@@ -157,10 +184,15 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
                     overloaded = True
                     break
                 if status in (400, 404):
-                    # Invalid request/model: another key will not repair this candidate.
+                    # Request/model issues are not repaired by rotating credentials.
                     break
-                if status in (401, 403, 429):
-                    # These may be key/project-specific, so rotate to the next distinct key.
+                if status in (403, 429):
+                    # Do not rotate keys to evade project permissions or quota limits.
+                    # Stop Gemini for this process and let the configured provider fallback run.
+                    _GEMINI_PAUSED_REASON = f"HTTP {status} ({kind})"
+                    break
+                if status == 401:
+                    # A distinct configured key can fix an invalid credential.
                     continue
                 if status >= 400:
                     break
@@ -172,6 +204,8 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
                 continue
 
         if tries is not None and attempts >= tries:
+            break
+        if _GEMINI_PAUSED_REASON:
             break
         if deadline - time.monotonic() <= 0:
             break

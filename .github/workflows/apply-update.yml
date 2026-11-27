@@ -8,11 +8,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+          persist-credentials: false
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Validate and stage package on a branch
@@ -23,7 +24,7 @@ jobs:
           test "${#packages[@]}" -eq 1 || { echo "Expected exactly one yt-doc-bot*.zip"; exit 1; }
           tmp="$(mktemp -d)"
           trap 'rm -rf "$tmp"' EXIT
-          unzip -q "${packages[0]}" -d "$tmp"
+          python tools/safe_extract.py "${packages[0]}" "$tmp"
           src="$(find "$tmp" -maxdepth 4 -name VERSION.txt -printf '%h\n' | head -n 1)"
           test -n "$src" || { echo "VERSION.txt not found in package"; exit 1; }
           test -f "$src/src/pipeline.py" -a -f "$src/src/script.py" -a -f "$src/config.yaml" -a -f "$src/requirements.txt" \
@@ -40,6 +41,7 @@ jobs:
         id: push
         env:
           BRANCH: ${{ steps.stage.outputs.branch }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git add -A
@@ -50,6 +52,7 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          gh auth setup-git
           git commit -m "Apply package update: ${{ steps.stage.outputs.version }}"
           git push --set-upstream origin "$BRANCH"
           echo "changed=true" >> "$GITHUB_OUTPUT"

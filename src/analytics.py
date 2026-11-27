@@ -27,6 +27,15 @@ def score(r):
     return r.get("views", 0) * (0.5 + r.get("averageViewPercentage", 0) / 100)
 
 
+def packaging_underperforming(report, threshold, minimum_impressions=100):
+    impressions = report.get("videoThumbnailImpressions")
+    ctr = report.get("videoThumbnailImpressionsClickRate")
+    if not isinstance(impressions, (int, float)) or impressions < minimum_impressions or ctr is None:
+        return False
+    ctr = ctr / 100 if ctr > 1 else ctr
+    return ctr < threshold
+
+
 def main():
     c = cfg()["optimize"]
     videos = [v for v in load_videos() if v.get("video_id")]
@@ -46,9 +55,10 @@ def main():
 
         # weak packaging -> swap thumbnail + title once, after 48h
         ctr = rep.get("videoThumbnailImpressionsClickRate")
-        if ctr is not None and ctr > 1:   # API may return percent instead of ratio
+        if ctr is not None and ctr > 1:
             ctr = ctr / 100
-        weak = (ctr is not None and ctr < c["ctr_threshold"]) or (ctr is None and rep["public_views"] < 30)
+        # Avoid changing live packaging based on a sparse or absent CTR sample.
+        weak = packaging_underperforming(rep, c["ctr_threshold"])
         if a >= c["thumb_swap_after_hours"] and weak and not rec["swapped"] and len(rec["thumb_ids"]) > 1:
             try:
                 with tempfile.TemporaryDirectory() as td:
@@ -67,23 +77,26 @@ def main():
 
     # ---- learn: category weights + lessons ----
     done = [v for v in videos if "7d" in v["snapshots"]]
+    reliable = [v for v in done if int(v["snapshots"]["7d"].get("views") or 0) >= 50]
     ins = load_insights()
-    if len(done) >= 3:
+    if len(reliable) >= 8:
         by = {}
-        for v in done:
+        for v in reliable:
             by.setdefault(v["category"], []).append(score(v["snapshots"]["7d"]))
         prior = cfg()["category_mix"]
-        avg = {k: sum(x) / len(x) for k, x in by.items()}
-        tot = sum(avg.values()) or 1
-        w = {k: 0.5 * prior.get(k, 0.1) + 0.5 * avg.get(k, 0) / tot for k in prior}
-        w = {k: max(x, 0.08) for k, x in w.items()}   # keep exploring every category
-        s = sum(w.values())
-        ins["weights"] = {k: round(x / s, 3) for k, x in w.items()}
-    if len(done) >= 4:
+        avg = {k: sum(x) / len(x) for k, x in by.items() if len(x) >= 3}
+        if len(avg) >= 2:
+            tot = sum(avg.values()) or 1
+            w = {k: 0.5 * prior.get(k, 0.1) + 0.5 * avg.get(k, 0) / tot for k in prior}
+            w = {k: max(x, 0.08) for k, x in w.items()}
+            s = sum(w.values())
+            ins["weights"] = {k: round(x / s, 3) for k, x in w.items()}
+    reliable_views = sum(int(v["snapshots"]["7d"].get("views") or 0) for v in reliable)
+    if len(reliable) >= 8 and reliable_views >= 1000:
         rows = "\n".join(f"- [{v['category']}] \"{v['title']}\" views={v['snapshots']['7d'].get('views')} "
                          f"avg_view%={v['snapshots']['7d'].get('averageViewPercentage')} "
                          f"ctr={v['snapshots']['7d'].get('videoThumbnailImpressionsClickRate')} "
-                         f"drop={v.get('drop')}" for v in done[-30:])
+                         f"drop={v.get('drop')}" for v in reliable[-30:])
         try:
             ins["lessons"] = gemini(
                 "Analyse these documentary videos (best and worst). Return 6 concrete, short rules to improve the "

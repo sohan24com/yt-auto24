@@ -3,8 +3,9 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from src import edit, story
+from src import edit, script, story
 
 
 SAMPLE_PATH = Path(__file__).resolve().parent.parent / "samples" / "antikythera_story_blueprint.json"
@@ -57,6 +58,74 @@ class StoryBlueprintTests(unittest.TestCase):
         issues = story.validate_blueprint(blueprint)
         self.assertTrue(any("cause/effect" in issue for issue in issues))
         self.assertTrue(any("visual anchor" in issue for issue in issues))
+
+    def test_visual_anchor_repair_uses_only_narration_and_existing_visual_phrase(self):
+        blueprint = {"scenes": [{
+            "narration": "Researchers found bronze gears beneath the shipwreck.",
+            "visual_anchor": "ancient temple",
+            "visuals": ["bronze gears shipwreck", "underwater divers"],
+            "visual_plan": {"description": "Underwater archaeological survey", "footage_keywords": ["divers"]},
+        }]}
+        repaired = story.align_visual_anchors(blueprint)
+        scene = repaired["scenes"][0]
+        self.assertIn(scene["visual_anchor"], {"bronze gears", "bronze gears shipwreck", "gears shipwreck"})
+        self.assertIn("bronze gears shipwreck", scene["visual_plan"]["description"])
+        narration_terms = story._tokens(scene["narration"])
+        visual_terms = story._tokens(scene["visual_plan"]["description"] + " " +
+                                     " ".join(scene["visual_plan"]["footage_keywords"]))
+        self.assertTrue(story._tokens(scene["visual_anchor"]) <= narration_terms & visual_terms)
+
+    def test_visual_anchor_repair_falls_back_to_labeled_illustrative_narration_terms(self):
+        blueprint = {"scenes": [{
+            "narration": "Researchers found bronze gears beneath the shipwreck.",
+            "visual_anchor": "unrelated mountain",
+            "visuals": ["mountain landscape"],
+            "visual_plan": {"description": "Mountain landscape", "footage_keywords": ["mountain"]},
+        }]}
+        repaired = story.align_visual_anchors(blueprint)["scenes"][0]
+        self.assertIn("illustrative, narration-derived visual target", repaired["visual_plan"]["description"])
+        self.assertTrue(story._tokens(repaired["visual_anchor"]) <= story._tokens(repaired["narration"]))
+        self.assertTrue(story._tokens(repaired["visual_anchor"]) <=
+                        story._tokens(repaired["visual_plan"]["description"] + " " +
+                                      " ".join(repaired["visual_plan"]["footage_keywords"])))
+
+    def test_loop_metadata_is_reconciled_to_explicit_scene_payoff(self):
+        blueprint = sample_blueprint()
+        loop = blueprint["open_loops"][0]
+        payoff_scene = next(scene for scene in blueprint["scenes"] if loop["id"] in scene["pays_off"])
+        loop["payoff_scene"] = payoff_scene["number"] + 1
+        repaired = story.reconcile_loop_references(blueprint)
+        self.assertEqual(payoff_scene["number"], repaired["open_loops"][0]["payoff_scene"])
+        self.assertIn(loop["id"], payoff_scene["pays_off"])
+        self.assertEqual([], [issue for issue in story.validate_blueprint(repaired)
+                              if issue.startswith("retention:")])
+
+    def test_loop_reconciliation_does_not_invent_missing_payoff(self):
+        blueprint = sample_blueprint()
+        loop = blueprint["open_loops"][0]
+        for scene in blueprint["scenes"]:
+            scene["pays_off"] = [item for item in scene["pays_off"] if item != loop["id"]]
+        repaired = story.reconcile_loop_references(blueprint)
+        self.assertTrue(any("no matching payoff" in issue for issue in story.validate_blueprint(repaired)))
+
+    def test_script_prompt_has_hook_contract_and_bounded_word_budget(self):
+        with patch("src.script.cfg", return_value={
+                "video": {"words_min": 1150, "words_max": 1400},
+                "channel": {"tone": "curious"}}), \
+             patch("src.script.load_insights", return_value={"lessons": []}), \
+             patch("src.script.prompt_skills", return_value=[]), \
+             patch("src.script.gemini", return_value={}) as call:
+            script.write_script({"topic": "Test topic", "angle": "A real question"})
+        prompt = call.call_args.args[0]
+        self.assertIn('"hook_text":""', prompt)
+        self.assertIn("at least 1150 narration words; hard maximum 1400", prompt)
+        self.assertIn("visual_anchor must be 1-3 concrete words", prompt)
+
+    def test_missing_hook_graphic_is_derived_from_spoken_opening(self):
+        draft = {"scenes": [{"narration": "A hidden bronze gear changed ancient history."}] * 10}
+        with patch("src.script.cfg", return_value={"video": {"words_min": 10, "words_max": 300}}):
+            script.valid(draft)
+        self.assertEqual("HIDDEN BRONZE GEAR CHANGED ANCIENT", draft["hook_text"])
 
     def test_repeated_narration_is_flagged(self):
         blueprint = sample_blueprint()
