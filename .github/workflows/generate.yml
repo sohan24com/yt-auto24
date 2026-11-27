@@ -18,13 +18,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 170
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with: { python-version: "3.11", cache: pip }
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core espeak-ng
       - run: pip install -r requirements.txt
+      - name: Prepare checkpoint directory
+        run: mkdir -p .work/checkpoint
+      - name: Restore resumable production checkpoint
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .work/checkpoint
+            .work/audio_library
+          key: documentary-checkpoint-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            documentary-checkpoint-${{ github.ref_name }}-
       - name: Build and publish one video
+        id: production
         env:
+          CHECKPOINT_DIR: .work/checkpoint
           FORCE: ${{ github.event.inputs.force }}
           PYTHONUNBUFFERED: "1"
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -46,9 +59,35 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python -m src.pipeline
+      - name: Ensure checkpoint cache has a file
+        if: always()
+        run: touch .work/checkpoint/.checkpoint-state
+      - name: Check checkpoint cache size
+        id: checkpoint_size
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          roots = [Path('.work/checkpoint'), Path('.work/audio_library')]
+          size = sum(p.stat().st_size for root in roots for p in root.rglob('*') if p.is_file())
+          limit = 5 * 1024 * 1024 * 1024
+          print(f'Checkpoint cache size: {size / (1024 ** 3):.2f} GiB')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f"cacheable={'true' if size <= limit else 'false'}\n")
+          PY
+      - name: Save resumable production checkpoint
+        if: always() && steps.checkpoint_size.outputs.cacheable == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .work/checkpoint
+            .work/audio_library
+          key: documentary-checkpoint-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Save memory
         if: always()
         run: |
           git config user.name "yt-bot"; git config user.email "bot@users.noreply.github.com"
           git add memory
           git diff --cached --quiet || (git commit -m "memory: new video" && git pull --rebase && git push)
+

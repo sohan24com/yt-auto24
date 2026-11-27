@@ -25,6 +25,30 @@ video:
   gemini_voice: "Schedar"                           # male, even tone (alternatives: Sulafat, Umbriel, Zephyr)
   max_footage_reuse: 0.35
 
+audio:
+  target_lufs: -14.0
+  true_peak_dbtp: -1.0
+  lra: 10
+  music_gain: 0.24
+  key_information_music_scale: 0.55
+  music_crossfade_seconds: 1.2
+  voice_noise_reduction_db: 0
+  scene_whoosh_max: 3
+  max_ambience_cues: 3
+  online_discovery: true
+  max_discoveries_per_run: 3
+  discovery_timeout_seconds: 45
+
+story:
+  minimum_quality_score: 76
+  hook_max_seconds: 5
+  min_progression_seconds: 20
+  max_progression_seconds: 45
+
+publishing:
+  require_search_linked_fact_check: true
+  require_license_manifest: true
+
 youtube:
   privacy: "public"     # becomes forced-private until your API project passes Google's audit
   category_id: "27"     # Education
