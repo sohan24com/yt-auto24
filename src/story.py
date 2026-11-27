@@ -43,6 +43,44 @@ def _scene_map(blueprint):
     return result
 
 
+def normalize_act_labels(blueprint):
+    """Repair only scene act numbers when a complete act outline is authoritative.
+
+    The act outline contains the explicit scene-to-act mapping. If it covers each
+    numbered scene exactly once, stale or malformed per-scene labels are safe to
+    derive from it; incomplete outlines are left untouched for validation.
+    """
+    if not isinstance(blueprint, dict) or not isinstance(blueprint.get("scenes"), list):
+        return blueprint
+    scenes = blueprint["scenes"]
+    acts = blueprint.get("acts")
+    if not isinstance(acts, list) or len(acts) != 3:
+        return blueprint
+    scene_map = _scene_map({"scenes": scenes})
+    if len(scene_map) != len(scenes) or set(scene_map) != set(range(1, len(scenes) + 1)):
+        return blueprint
+    expected = {}
+    try:
+        for act_number, act in enumerate(acts, 1):
+            if not isinstance(act, dict) or not isinstance(act.get("scene_numbers"), list):
+                return blueprint
+            for number in act["scene_numbers"]:
+                number = int(number)
+                if number in expected or number not in scene_map:
+                    return blueprint
+                expected[number] = act_number
+    except (TypeError, ValueError):
+        return blueprint
+    if set(expected) != set(scene_map):
+        return blueprint
+    result = dict(blueprint)
+    result["scenes"] = [
+        {**scene, "act": expected[index]} if isinstance(scene, dict) else scene
+        for index, scene in enumerate(scenes, 1)
+    ]
+    return result
+
+
 def align_visual_anchors(blueprint):
     """Align planned scene visuals to narrated terms without asserting authenticity."""
     if not isinstance(blueprint, dict) or not isinstance(blueprint.get("scenes"), list):
@@ -342,7 +380,8 @@ def validate_blueprint(blueprint, require_evidence=False):
     repetitions = []
     for number, scene in scene_map.items():
         narration = str(scene.get("narration", "")).strip()
-        if len(narration.split()) < 8:
+        minimum_words = 6 if number == 1 else 8
+        if len(narration.split()) < minimum_words:
             issues.append(f"story: scene {number} narration is too short to advance the story")
         if not scene.get("story_purpose") or not scene.get("story_progress") or not scene.get("causal_link"):
             issues.append(f"story: scene {number} needs purpose, progression, and a cause/effect link")

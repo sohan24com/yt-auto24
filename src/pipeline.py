@@ -93,6 +93,26 @@ def gate(final, total, reuse, asset_manifest=None):
             bad.append(f"asset license URL is missing: {label}")
     return bad
 
+
+def _narration_budget_feedback(script, limits, reported_count=None):
+    """Give the retry prompt a corrective instruction that matches the deficit."""
+    current = (int(reported_count) if reported_count is not None else
+               S.words(script.get("scenes", [])) if isinstance(script, dict) else 0)
+    target = (int(limits["words_min"]) + int(limits["words_max"])) // 2
+    minimum = int(limits["words_min"] * 0.9)
+    if current < minimum:
+        return (
+            f"Narration budget is under length: current {current}; minimum {minimum}; target {target}. "
+            f"Add at least {minimum - current} substantive, evidence-supported words across scenes 2-17. "
+            "Expand context, evidence, consequences, and causal links; preserve the short opening and outro. "
+            "Do not compress."
+        )
+    return (
+        f"Narration budget is over length: current {current}; target {target}; "
+        f"hard maximum {limits['words_max']}. Remove repeated exposition and decorative filler across scenes "
+        "while preserving evidence, causality, uncertainty, and payoffs."
+    )
+
 def build_once(wd, validation_feedback=None):
     wd = Path(wd)
     state = _load_state(wd)
@@ -116,17 +136,20 @@ def build_once(wd, validation_feedback=None):
         for attempt in range(1, max_attempts + 1):
             script = S.write_script(topic, validation_feedback=problems,
                                     previous_draft=previous_draft)
-            problems = S.valid(script)
+            problems = list(S.valid(script))
             if not problems:
                 break
             print(f"script rejected (draft {attempt}/{max_attempts}):", problems)
             previous_draft = script if isinstance(script, dict) else None
             limits = cfg()["video"]
-            if any(str(issue).startswith("word count ") for issue in problems):
-                problems.append(
-                    f"Narration budget: target {(int(limits['words_min']) + int(limits['words_max'])) // 2} words; "
-                    f"hard maximum {limits['words_max']}. Compress repeated exposition across all scenes."
-                )
+            word_count_issue = next((str(issue) for issue in problems
+                                     if str(issue).startswith("word count ")), None)
+            if word_count_issue:
+                try:
+                    reported_count = int(word_count_issue.split()[2])
+                except (IndexError, ValueError):
+                    reported_count = None
+                problems.append(_narration_budget_feedback(script, limits, reported_count))
         else:
             raise RuntimeError(f"could not produce a valid script: {problems}")
         checked = S.fact_check(script)

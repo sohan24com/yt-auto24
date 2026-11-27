@@ -65,7 +65,8 @@ Lessons from channel analytics (apply only when consistent with evidence):
                    json.dumps(previous_draft, ensure_ascii=False))
     result = gemini(prompt, temperature=0.75)
     if isinstance(result, dict):
-        from .story import align_visual_anchors, reconcile_loop_references
+        from .story import align_visual_anchors, normalize_act_labels, reconcile_loop_references
+        result = normalize_act_labels(result)
         result = align_visual_anchors(result)
         result = reconcile_loop_references(result)
         if not 3 <= len(str(result.get("hook_text", "")).split()) <= 5 and result.get("scenes"):

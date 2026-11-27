@@ -81,6 +81,26 @@ class StoryBlueprintTests(unittest.TestCase):
         self.assertIn("illustrative, narration-derived visual target", repaired["visual_plan"]["description"])
         self.assertTrue(story._tokens(repaired["visual_anchor"]) <= story._tokens(repaired["narration"]))
 
+    def test_act_labels_are_repaired_only_from_a_complete_outline(self):
+        blueprint = sample_blueprint()
+        for scene in blueprint["scenes"]:
+            scene["act"] = 3
+        repaired = story.normalize_act_labels(blueprint)
+        self.assertEqual([1] * 5 + [2] * 9 + [3] * 4,
+                         [scene["act"] for scene in repaired["scenes"]])
+        self.assertFalse(any("act labels" in issue for issue in story.validate_blueprint(repaired)))
+
+        incomplete = sample_blueprint()
+        incomplete["acts"][0]["scene_numbers"].pop()
+        untouched = story.normalize_act_labels(incomplete)
+        self.assertEqual(incomplete["scenes"], untouched["scenes"])
+
+    def test_six_word_cold_open_is_not_mistaken_for_a_short_progression_scene(self):
+        blueprint = sample_blueprint()
+        blueprint["scenes"][0]["narration"] = "This hidden machine changed ancient history."
+        issues = story.validate_blueprint(blueprint)
+        self.assertFalse(any("scene 1 narration is too short" in issue for issue in issues))
+
     def test_loop_metadata_follows_explicit_payoff_marker_without_fabricating_one(self):
         blueprint = sample_blueprint()
         loop = blueprint["open_loops"][0]
