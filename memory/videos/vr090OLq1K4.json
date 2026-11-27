@@ -1,0 +1,81 @@
+{
+ "video_id": "vr090OLq1K4",
+ "url": "https://youtu.be/vr090OLq1K4",
+ "created": "2026-11-27T08:45:59.548548+00:00",
+ "day": 5,
+ "topic": "The Kryptos Cipher at CIA Headquarters",
+ "angle": "Why has the final quadrant of a public bronze sculpture sitting right in the CIA courtyard defied the world's top cryptographers and supercomputers for over three decades?",
+ "category": "mystery",
+ "title": "The CIA Cipher Supercomputers Can't Solve",
+ "title_b": "How 97 Letters Defied World-Class Codebreakers",
+ "thumb_ids": [
+  "1EOn0mmuP3eTka6zM_6s2DYA5KGa-PWhL",
+  "1SS8yREKqLEU0THWU4k91RnUFcaj1bubE",
+  "1lGEkb19vfXlkdxwiY48l67lwaEPRZs53"
+ ],
+ "drive_video_id": "1O12x629NAFCJGkVAPREYdEm7Z5EgWQAW",
+ "duration": 595,
+ "short_id": "c_TvKtkPymE",
+ "scenes": [
+  {
+   "title": "The Courtyard Secret",
+   "start": 0
+  },
+  {
+   "title": "An Unlikely Collaboration",
+   "start": 51
+  },
+  {
+   "title": "The Monument of Letters",
+   "start": 103
+  },
+  {
+   "title": "Cracking K1 \u2013 The Subtle Shift",
+   "start": 157
+  },
+  {
+   "title": "K2 \u2013 Shadows and Coordinates",
+   "start": 216
+  },
+  {
+   "title": "K3 \u2013 Opening the Tomb",
+   "start": 268
+  },
+  {
+   "title": "The Impassable Wall of K4",
+   "start": 330
+  },
+  {
+   "title": "The Decades-Long Siege",
+   "start": 376
+  },
+  {
+   "title": "The Artist Drops Clues",
+   "start": 425
+  },
+  {
+   "title": "The Cryptographic Anatomy of K4",
+   "start": 483
+  },
+  {
+   "title": "The Secret in the Envelope",
+   "start": 536
+  }
+ ],
+ "fact_check_changes": [],
+ "swapped": false,
+ "snapshots": {},
+ "localized": [
+  "ar",
+  "bn",
+  "de",
+  "es",
+  "fr",
+  "hi",
+  "id",
+  "ja",
+  "pt",
+  "ru"
+ ],
+ "short_scene": "The Courtyard Secret"
+}
