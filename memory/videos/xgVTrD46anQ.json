@@ -81,5 +81,8 @@
   "pt",
   "ru"
  ],
- "short_scene": "The Scorched Wilderness"
+ "short_scene": "The Scorched Wilderness",
+ "latest": {
+  "public_views": 2
+ }
 }

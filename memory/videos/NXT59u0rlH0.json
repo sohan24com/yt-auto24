@@ -77,5 +77,8 @@
   "pt",
   "ru"
  ],
- "short_scene": "The Signal from Sagittarius"
+ "short_scene": "The Signal from Sagittarius",
+ "latest": {
+  "public_views": 5
+ }
 }
