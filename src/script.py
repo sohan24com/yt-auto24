@@ -34,8 +34,8 @@ STORY CONTRACT
 - Plan 20-45 seconds of spoken progression for scenes 2-18. Put a target_duration_seconds estimate in each plan; actual audio timing is checked after voice generation.
 - Use a pattern interrupt only when it clarifies or changes the viewer's understanding; do not add empty spectacle.
 - Deliver a satisfying resolution in scene 17, then a brief thank-you/Like/Comment/Subscribe/related-next-video invitation in scene 18.
-- NARRATION LENGTH IS A HARD CONSTRAINT: write at least {minimum_total} and at most {maximum_total}
-  narration words total; aim for {target_total}. Count only spoken narration. Do not stop early.
+- NARRATION LENGTH IS A HARD CONSTRAINT: write at least {minimum_total} narration words; hard maximum {maximum_total};
+  aim for {target_total}. Count only spoken narration. Do not stop early.
   Scene 1 must be one standalone sentence of 6-12 words. Scene 18 should be a concise 20-30 word outro.
   Each of scenes 2-17 needs roughly {per_scene_min}-{per_scene_max} spoken words (aim for about
   {progression_budget} each). Add evidence-backed context, causal explanation, uncertainty and payoffs;

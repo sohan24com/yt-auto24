@@ -84,7 +84,7 @@ class StoryBlueprintTests(unittest.TestCase):
             script.write_script({"topic": "Test topic", "angle": "A real question"})
         prompt = call.call_args.args[0]
         self.assertIn('"hook_text":""', prompt)
-        self.assertIn("at least 1150 and at most 1400", prompt)
+        self.assertIn("at least 1150 narration words; hard maximum 1400", prompt)
         self.assertIn("visual_anchor must be 1-3 concrete words", prompt)
 
     def test_missing_hook_graphic_is_derived_from_the_spoken_opening(self):
