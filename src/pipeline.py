@@ -149,7 +149,7 @@ def build_once(wd, validation_feedback=None):
         if not isinstance(previous_draft, dict):
             previous_draft = script if isinstance(script, dict) else None
         problems = list(state.get("script_feedback") or validation_feedback or [])
-        max_attempts = 5
+        max_attempts = 3
         for attempt in range(1, max_attempts + 1):
             script = S.write_script(topic, validation_feedback=problems,
                                     previous_draft=previous_draft)
@@ -603,4 +603,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
