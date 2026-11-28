@@ -581,6 +581,10 @@ def _groq(prompt, system=None, json_out=True, temperature=0.9, grounding=False,
                 except requests.Timeout:
                     last = f"{model}: request timed out"
                     continue
+                except (ValueError, KeyError, IndexError, TypeError) as exc:
+                    last = f"{model}: response parse failed ({type(exc).__name__})"
+                    print(f"Groq response parse failed: {model} ({type(exc).__name__})")
+                    continue
                 except Exception as exc:
                     last = f"{model}: {type(exc).__name__}"
                     continue
@@ -647,6 +651,10 @@ def _groq(prompt, system=None, json_out=True, temperature=0.9, grounding=False,
                 break
             except requests.Timeout:
                 last = f"{model}: request timed out"
+                continue
+            except (ValueError, KeyError, IndexError, TypeError) as ex:
+                last = f"{model}: response parse failed ({type(ex).__name__})"
+                print(f"Groq response parse failed: {model} ({type(ex).__name__})")
                 continue
             except Exception as ex:
                 last = f"{model}: {type(ex).__name__}"
