@@ -16,22 +16,24 @@ class GroundedFallbackTests(unittest.TestCase):
         cloudflare.assert_not_called()
         openrouter.assert_not_called()
 
-    def test_groq_grounded_request_requires_browser_search_without_json_mode(self):
+    def test_groq_grounded_request_uses_responses_browser_search(self):
         response = unittest.mock.Mock()
         response.status_code = 200
         response.json.return_value = {
-            "choices": [{"message": {"content": '{"scenes": [], "sources": ["https://example.org"]}'}}]
+            "output_text": '{"scenes": [], "sources": ["https://example.org"]}'
         }
         env_values = {"GROQ_API_KEY": "test-key", "GROQ_API_KEY_2": ""}
         with patch.object(common, "env", side_effect=lambda name, required=True: env_values.get(name, "")), \
              patch.object(common.requests, "post", return_value=response) as post:
             result = common._groq("Return JSON", grounding=True, max_completion_tokens=1600)
         self.assertEqual(result["sources"], ["https://example.org"])
+        self.assertTrue(post.call_args.args[0].endswith("/responses"))
         payload = post.call_args.kwargs["json"]
         self.assertEqual(payload["model"], "openai/gpt-oss-20b")
         self.assertEqual(payload["tools"], [{"type": "browser_search"}])
         self.assertEqual(payload["tool_choice"], "required")
-        self.assertEqual(payload["max_completion_tokens"], 1600)
+        self.assertEqual(payload["max_output_tokens"], 1600)
+        self.assertEqual(payload["input"], "Return JSON")
         self.assertNotIn("response_format", payload)
 
 
