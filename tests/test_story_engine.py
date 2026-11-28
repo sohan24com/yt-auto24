@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from src import edit, script, story
+from src import edit, pipeline, script, story
 
 
 SAMPLE_PATH = Path(__file__).resolve().parent.parent / "samples" / "antikythera_story_blueprint.json"
@@ -73,6 +73,22 @@ class StoryBlueprintTests(unittest.TestCase):
         durations = [scene["target_duration_seconds"] for scene in blueprint["scenes"]]
         durations[-1] = 4.99
         self.assertTrue(any("actual outro" in issue for issue in story.validate_timing(blueprint, durations)))
+
+    def test_missing_opening_loop_reports_the_empty_field_and_actionable_repair(self):
+        blueprint = sample_blueprint()
+        blueprint["scenes"][0]["opens_loop"] = []
+        issues = story.validate_blueprint(blueprint)
+        self.assertTrue(any("scene 1 field 'opens_loop'" in issue for issue in issues))
+        feedback = pipeline._script_repair_feedback(issues)
+        self.assertTrue(any("opened_scene=1" in item and "payoff_scene" in item
+                            for item in feedback))
+
+    def test_script_prompt_requires_scene_one_to_open_the_registered_loop(self):
+        blueprint = sample_blueprint()
+        with patch("src.script.gemini", return_value=blueprint) as provider:
+            script.write_script({"topic": "Test", "angle": "A question"})
+        self.assertIn("Scene 1 MUST set opens_loop to a non-empty list", provider.call_args.args[0])
+        self.assertIn("open_loops[0].opened_scene MUST be 1", provider.call_args.args[0])
 
     def test_open_loop_without_later_payoff_is_rejected(self):
         blueprint = sample_blueprint()
