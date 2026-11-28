@@ -539,9 +539,15 @@ def assemble(scenes, durs, plans, assets_by_scene, voice, wd, out, hook_text="",
             o = wd / f"shot{n:04d}.mp4"
             if not _shot_is_complete(o, l):
                 decision = decisions[shot_i] if shot_i < len(decisions) else {}
+                if not isinstance(decision, dict):
+                    decision = {}
+                visual_plan = scene.get("visual_plan")
+                camera_movement = (visual_plan.get("camera_movement")
+                                   if isinstance(visual_plan, dict) else None)
                 render_shot(a, l, o, n, punch=clock < 10.0,
                             emotion=scene.get("emotion", ""),
-                            movement=decision.get("movement", "push_in"))
+                            movement=decision.get("movement", "push_in"),
+                            camera_movement=camera_movement)
             shots.append(o)
             shot_labels.append((clock, clock + l, _source_label(a)))
             clock += l
