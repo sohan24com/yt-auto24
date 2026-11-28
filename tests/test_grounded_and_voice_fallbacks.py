@@ -60,3 +60,5 @@ class OfflineVoiceFallbackTests(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
+
+# CI branch smoke marker: exercises Groq Responses browser-search fallback.
