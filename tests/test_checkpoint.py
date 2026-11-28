@@ -52,6 +52,47 @@ class CheckpointAndSafetyTests(unittest.TestCase):
             self.assertEqual(state, pipeline._load_state(tmp))
             self.assertFalse((Path(tmp) / "checkpoint.tmp").exists())
 
+    def test_resume_retries_unverified_fact_check_without_regenerating_script(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            script = {"scenes": [{"title": "The clue", "narration": "An unresolved claim."}],
+                      "_fact_check": {"status": "not_verified", "claims": []}}
+            state = {"version": pipeline.CHECKPOINT_VERSION,
+                     "topic": {"topic": "A topic", "angle": "A question"}, "script": script}
+            pipeline._save_state(tmp, state)
+            verified = {**script, "_fact_check": {"status": "search_linked", "claims": []}}
+            with patch("src.pipeline.cfg", return_value={
+                    "publishing": {"require_search_linked_fact_check": True}}), \
+                 patch("src.pipeline.F.reset"), \
+                 patch("src.pipeline.S.valid", return_value=[]) as validate_script, \
+                 patch("src.pipeline.S.write_script") as write_script, \
+                 patch("src.pipeline._fact_check_and_attach", return_value=verified) as fact_check, \
+                 patch("src.pipeline.STORY.validate_blueprint",
+                       side_effect=RuntimeError("reached story validation")):
+                with self.assertRaisesRegex(RuntimeError, "reached story validation"):
+                    pipeline.build_once(tmp)
+            fact_check.assert_called_once_with(script)
+            validate_script.assert_called_once_with(script)
+            write_script.assert_not_called()
+            self.assertEqual("search_linked", pipeline._load_state(tmp)["script"]["_fact_check"]["status"])
+
+    def test_resume_reuses_search_linked_fact_check_without_repeating_search(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            script = {"scenes": [{"title": "The clue", "narration": "A sourced claim."}],
+                      "_fact_check": {"status": "search_linked", "claims": [{"scene": 1}]}}
+            pipeline._save_state(tmp, {"version": pipeline.CHECKPOINT_VERSION,
+                                       "topic": {"topic": "A topic", "angle": "A question"},
+                                       "script": script})
+            with patch("src.pipeline.cfg", return_value={
+                    "publishing": {"require_search_linked_fact_check": True}}), \
+                 patch("src.pipeline.F.reset"), \
+                 patch("src.pipeline.S.valid", return_value=[]), \
+                 patch("src.pipeline._fact_check_and_attach") as fact_check, \
+                 patch("src.pipeline.STORY.validate_blueprint",
+                       side_effect=RuntimeError("reached story validation")):
+                with self.assertRaisesRegex(RuntimeError, "reached story validation"):
+                    pipeline.build_once(tmp)
+            fact_check.assert_not_called()
+
     def test_incompatible_checkpoint_version_is_ignored(self):
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / "checkpoint.json").write_text('{"version": 999}', encoding="utf-8")
@@ -234,3 +275,4 @@ class CheckpointAndSafetyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

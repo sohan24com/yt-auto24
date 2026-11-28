@@ -113,6 +113,17 @@ def _narration_budget_feedback(script, limits, reported_count=None):
         "while preserving evidence, causality, uncertainty, and payoffs."
     )
 
+
+def _fact_check_and_attach(script):
+    """Run live claim checks and preserve the generated story plan."""
+    checked = S.fact_check(script)
+    checked = STORY.preserve_planning(script, checked)
+    checked = STORY.align_visual_anchors(checked)
+    checked = STORY.reconcile_loop_references(checked)
+    for key in ("setting", "wiki_terms", "hook_text"):
+        checked[key] = script.get(key, checked.get(key))
+    return STORY.attach_evidence(checked, checked.get("_fact_check", {}))
+
 def build_once(wd, validation_feedback=None):
     wd = Path(wd)
     state = _load_state(wd)
@@ -122,6 +133,7 @@ def build_once(wd, validation_feedback=None):
     _save_state(wd, state)
     print("TOPIC:", topic)
     script = None
+    fact_checked_this_run = False
     problems = list(validation_feedback or [])
     script = state.get("script")
     if not isinstance(script, dict):
@@ -165,16 +177,19 @@ def build_once(wd, validation_feedback=None):
                 _save_state(wd, state)
         else:
             raise RuntimeError(f"could not produce a valid script: {problems}")
-        checked = S.fact_check(script)
-        checked = STORY.preserve_planning(script, checked)
-        checked = STORY.align_visual_anchors(checked)
-        checked = STORY.reconcile_loop_references(checked)
-        for k in ("setting", "wiki_terms", "hook_text"):
-            checked[k] = script.get(k, checked.get(k))
-        checked = STORY.attach_evidence(checked, checked.get("_fact_check", {}))
-        script = checked
+        script = _fact_check_and_attach(script)
+        fact_checked_this_run = True
         state.pop("script_draft", None)
         state.pop("script_feedback", None)
+        state["script"] = script
+        _save_state(wd, state)
+    if (cfg().get("publishing", {}).get("require_search_linked_fact_check", True)
+            and script.get("_fact_check", {}).get("status") != "search_linked"
+            and not fact_checked_this_run):
+        # An interrupted/failed run may have checkpointed a valid script with an
+        # unavailable fact-check provider. Reuse the script, but retry grounded
+        # research instead of treating a not_verified result as a completed stage.
+        script = _fact_check_and_attach(script)
         state["script"] = script
         _save_state(wd, state)
     checked = script
@@ -587,3 +602,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
