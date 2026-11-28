@@ -1,4 +1,4 @@
-import json, os, re, time, datetime as dt, tempfile
+import atexit, json, os, re, time, datetime as dt, tempfile
 from pathlib import Path
 import requests, yaml
 
@@ -127,47 +127,143 @@ def _provider_error_message(response, secrets=()):
 
 # Keep this allowlist limited to models whose standard text API has a documented free tier.
 # Model discovery only decides which supported allowlisted IDs to try; it never enables paid IDs.
-GEMINI_FALLBACK_MODELS = (
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-2.0-flash",
-)
+GEMINI_MODEL_PREFERENCES = {
+    "general": ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite"),
+    "grounding": ("gemini-2.5-flash", "gemini-2.5-flash-lite"),
+}
+GEMINI_FALLBACK_MODELS = GEMINI_MODEL_PREFERENCES["general"]
+GEMINI_BLOCKED_MODELS = ("gemini-2-flash", "gemini-2-flash-lite")
 
-_MODELS = []
+# Per-mode selected order and the one-time ListModels catalog for this process.
+_MODELS = {}
+_MODEL_CATALOG = None
+_MODEL_DISCOVERY_FAILED = False
+_GEMINI_MODEL_COUNTS = {}
+_GEMINI_MODEL_COUNTS_LOGGED = False
 
 
-def _model_list(key):
-    """Discover supported Gemini Flash text models and prefer configured candidates."""
+def _model_is_allowed(name):
+    lowered = name.lower()
+    if "pro" in lowered:
+        return False
+    return not any(lowered == blocked or lowered.startswith(blocked + "-")
+                   for blocked in GEMINI_BLOCKED_MODELS)
+
+
+def _list_models(keys):
+    """Fetch every ListModels page using the first credential that completes discovery."""
+    global _MODEL_CATALOG, _MODEL_DISCOVERY_FAILED
+    if _MODEL_CATALOG is not None:
+        return _MODEL_CATALOG
+
+    for key_index, key in keys:
+        catalog = {}
+        page_token = None
+        seen_tokens = set()
+        try:
+            while True:
+                params = {"key": key, "pageSize": 1000}
+                if page_token:
+                    params["pageToken"] = page_token
+                response = requests.get(
+                    "https://generativelanguage.googleapis.com/v1beta/models",
+                    params=params, timeout=30)
+                response.raise_for_status()
+                payload = response.json()
+                if not isinstance(payload, dict):
+                    raise ValueError("invalid ListModels response")
+                for model in payload.get("models", []):
+                    if not isinstance(model, dict):
+                        continue
+                    name = str(model.get("name", "")).removeprefix("models/")
+                    methods = model.get("supportedGenerationMethods", [])
+                    if name and isinstance(methods, list) and "generateContent" in methods:
+                        catalog[name] = methods
+                next_token = payload.get("nextPageToken")
+                if not next_token:
+                    _MODEL_CATALOG = catalog
+                    _MODEL_DISCOVERY_FAILED = False
+                    return _MODEL_CATALOG
+                if next_token in seen_tokens:
+                    raise ValueError("repeated ListModels page token")
+                seen_tokens.add(next_token)
+                page_token = next_token
+        except Exception as exc:
+            print(f"Gemini ListModels failed with key {key_index}/5: {type(exc).__name__}")
+
+    _MODEL_CATALOG = {}
+    _MODEL_DISCOVERY_FAILED = True
+    return _MODEL_CATALOG
+
+
+def _select_preferred_models(catalog, preferred):
+    selected = []
+    for requested in preferred:
+        if not _model_is_allowed(requested):
+            print(f"model skipped (not in ListModels): {requested}")
+            continue
+        match = requested if requested in catalog else None
+        if match is None:
+            latest = requested + "-latest"
+            preview = requested + "-preview"
+            dated_previews = sorted(name for name in catalog
+                                    if name.startswith(preview + "-"))
+            match = latest if latest in catalog else preview if preview in catalog else (
+                dated_previews[0] if dated_previews else None)
+            if match:
+                print(f"model mapped: {requested} -> {match}")
+        if match is None:
+            print(f"model skipped (not in ListModels): {requested}")
+            continue
+        if not _model_is_allowed(match):
+            continue
+        if match not in selected:
+            selected.append(match)
+    return selected
+
+
+def _model_list(keys, grounding=False):
+    """Return the cached preference order verified against the ListModels catalog."""
     global _MODELS
-    if _MODELS:
-        return _MODELS
-    c = cfg()
-    available = []
-    try:
-        r = requests.get("https://generativelanguage.googleapis.com/v1beta/models",
-                         params={"key": key, "pageSize": 1000}, timeout=30)
-        r.raise_for_status()
-        for model in r.json().get("models", []):
-            name = model.get("name", "").split("/")[-1]
-            methods = model.get("supportedGenerationMethods", [])
-            lowered = name.lower()
-            if ("generateContent" in methods and lowered.startswith("gemini-")
-                    and "flash" in lowered and not any(
-                        token in lowered for token in ("tts", "embedding", "image", "live"))):
-                available.append(name)
-    except Exception as e:
-        print("model discovery failed:", type(e).__name__)
+    mode = "grounding" if grounding else "general"
+    if not isinstance(_MODELS, dict):
+        _MODELS = {}
+    if mode in _MODELS:
+        return _MODELS[mode]
 
-    configured = [c.get("gemini_model", "")] + list(c.get("gemini_fallbacks", []))
-    if available:
-        preferred = [name for name in configured if name in available]
-        discovered = sorted(available, key=lambda name: (
-            "preview" in name.lower(), "lite" in name.lower(), name))
-        _MODELS = list(dict.fromkeys(preferred + discovered))
+    if isinstance(keys, str):
+        keys = [(1, keys)]
+    _list_models(keys)
+    preferred = GEMINI_MODEL_PREFERENCES[mode]
+    if not _MODEL_DISCOVERY_FAILED:
+        models = _select_preferred_models(_MODEL_CATALOG, preferred)
     else:
-        _MODELS = list(dict.fromkeys(configured + list(GEMINI_FALLBACK_MODELS)))
-    print("Gemini Flash text models to try:", _MODELS)
-    return _MODELS
+        print("WARNING: ListModels failed with all configured keys; using the "
+              f"unverified {mode} Gemini model preference order.")
+        models = [name for name in preferred if _model_is_allowed(name)]
+    _MODELS[mode] = models
+    for model in models:
+        _GEMINI_MODEL_COUNTS.setdefault(model, {"success": 0, "404": 0, "429": 0})
+    print(f"Gemini {mode} models to try: {models}")
+    return models
+
+
+def _log_gemini_model_counts():
+    global _GEMINI_MODEL_COUNTS_LOGGED
+    if _GEMINI_MODEL_COUNTS_LOGGED:
+        return
+    _GEMINI_MODEL_COUNTS_LOGGED = True
+    if not _GEMINI_MODEL_COUNTS:
+        print("Gemini model outcomes: no model attempts")
+        return
+    details = "; ".join(
+        f"{model}: success={counts['success']}, 404={counts['404']}, 429={counts['429']}"
+        for model, counts in _GEMINI_MODEL_COUNTS.items())
+    print("Gemini model outcomes: " + details)
+
+
+atexit.register(_log_gemini_model_counts)
+
 
 class GeminiUnavailableError(RuntimeError):
     """Raised after bounded attempts across the configured Gemini keys and models."""
@@ -175,6 +271,7 @@ class GeminiUnavailableError(RuntimeError):
 
 # Gemini is available at the start of each run; failures may pause it later.
 _GEMINI_PAUSED_REASON = ""
+_GEMINI_KEY_COUNT_LOGGED = False
 _GEMINI_KEY_COUNT_LOGGED = False
 
 
@@ -210,7 +307,7 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
     if not keys:
         raise GeminiUnavailableError("No Gemini API keys are configured")
 
-    models = _model_list(keys[0][1])
+    models = _model_list(keys, grounding=grounding)
     if not models:
         raise GeminiUnavailableError("No Gemini models are available to try")
 
@@ -242,10 +339,16 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
                 if r.status_code == 200:
                     parts = r.json()["candidates"][0]["content"]["parts"]
                     text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
-                    return extract_json(text) if json_out else text
+                    result = extract_json(text) if json_out else text
+                    _GEMINI_MODEL_COUNTS.setdefault(
+                        model, {"success": 0, "404": 0, "429": 0})["success"] += 1
+                    return result
 
                 status = int(r.status_code)
                 status_counts[status] = status_counts.get(status, 0) + 1
+                if status in (404, 429):
+                    _GEMINI_MODEL_COUNTS.setdefault(
+                        model, {"success": 0, "404": 0, "429": 0})[str(status)] += 1
                 kinds = {
                     400: "request format or model configuration",
                     401: "API key authentication",
