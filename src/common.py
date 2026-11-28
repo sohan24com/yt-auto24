@@ -151,6 +151,10 @@ class GeminiUnavailableError(RuntimeError):
     """Raised after bounded attempts across the configured Gemini keys and models."""
 
 
+# Gemini is available at the start of each run; failures may pause it later.
+_GEMINI_PAUSED_REASON = None
+
+
 def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
            tries=None, request_timeout=90, total_timeout=300, max_output_tokens=32000):
     global _GEMINI_PAUSED_REASON
