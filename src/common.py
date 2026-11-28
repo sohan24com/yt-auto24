@@ -183,6 +183,7 @@ _MODEL_DISCOVERY_FAILED = False
 _GEMINI_MODEL_COUNTS = {}
 _GEMINI_MODEL_COUNTS_LOGGED = False
 _GEMINI_TOTAL_CALLS = 0
+_GEMINI_LISTMODEL_CALLS = 0
 _GEMINI_DISABLED_MODELS = set()
 _GEMINI_DISABLED_PAIRS = set()
 _GEMINI_429_KEYS_BY_MODEL = {}
@@ -198,7 +199,7 @@ def _model_is_allowed(name):
 
 def _list_models(keys):
     """Fetch every ListModels page using the first credential that completes discovery."""
-    global _MODEL_CATALOG, _MODEL_DISCOVERY_FAILED
+    global _MODEL_CATALOG, _MODEL_DISCOVERY_FAILED, _GEMINI_LISTMODEL_CALLS
     if _MODEL_CATALOG is not None:
         return _MODEL_CATALOG
 
@@ -211,6 +212,7 @@ def _list_models(keys):
                 params = {"key": key, "pageSize": 1000}
                 if page_token:
                     params["pageToken"] = page_token
+                _GEMINI_LISTMODEL_CALLS += 1
                 response = requests.get(
                     "https://generativelanguage.googleapis.com/v1beta/models",
                     params=params, timeout=30)
@@ -302,13 +304,16 @@ def _log_gemini_model_counts():
         return
     _GEMINI_MODEL_COUNTS_LOGGED = True
     if not _GEMINI_MODEL_COUNTS:
-        print("Gemini model outcomes: no model attempts; total Gemini generation calls=0")
+        print("Gemini model outcomes: no model attempts; total Gemini calls="
+              f"{_GEMINI_LISTMODEL_CALLS} (generation=0, ListModels={_GEMINI_LISTMODEL_CALLS})")
         return
     details = "; ".join(
         f"{model}: success={counts.get('success', 0)}, 404={counts.get('404', 0)}, "
         f"429={counts.get('429', 0)}, 503={counts.get('503', 0)}"
         for model, counts in _GEMINI_MODEL_COUNTS.items())
-    print(f"Gemini model outcomes: {details}; total Gemini generation calls={_GEMINI_TOTAL_CALLS}")
+    total_calls = _GEMINI_TOTAL_CALLS + _GEMINI_LISTMODEL_CALLS
+    print(f"Gemini model outcomes: {details}; total Gemini calls={total_calls} "
+          f"(generation={_GEMINI_TOTAL_CALLS}, ListModels={_GEMINI_LISTMODEL_CALLS})")
 
 
 atexit.register(_log_gemini_model_counts)
