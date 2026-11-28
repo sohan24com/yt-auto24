@@ -68,8 +68,10 @@ class PipelineTests(unittest.TestCase):
                 {"name": "models/gemini-2-flash-lite", "supportedGenerationMethods": ["generateContent"]},
             ]
         }
-        with patch("src.common.requests.get", return_value=SimpleNamespace(
-                json=lambda: api_models, raise_for_status=lambda: None)):
+        with (
+            patch("src.common.requests.get", return_value=SimpleNamespace(
+                json=lambda: api_models, raise_for_status=lambda: None)),
+        ):
             models = common._model_list("test-key")
             grounding_models = common._model_list("test-key", grounding=True)
         self.assertEqual([
@@ -95,7 +97,7 @@ class PipelineTests(unittest.TestCase):
             }, clear=False),
             patch("src.common._model_list", return_value=["gemini-model"]),
             patch("src.common.requests.post", side_effect=[
-                gemini_quota, groq_rejected, groq_success,
+                gemini_quota, gemini_quota, groq_rejected, groq_success,
             ]) as post,
         ):
             result = common.gemini("test prompt", request_timeout=1, total_timeout=5)
@@ -120,6 +122,7 @@ class PipelineTests(unittest.TestCase):
             }, clear=False),
             patch("src.common._model_list", return_value=["gemini-model"]),
             patch("src.common.requests.post", side_effect=[
+                self._gemini_response(429, text="quota"),
                 self._gemini_response(429, text="quota"),
                 groq_quota, groq_success,
             ]) as post,
@@ -320,4 +323,5 @@ class PipelineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
 
