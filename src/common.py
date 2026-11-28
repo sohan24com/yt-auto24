@@ -285,6 +285,65 @@ def _groq(prompt, system=None, json_out=True, temperature=0.9, grounding=False,
     if not keys:
         raise GroqUnavailableError("No Groq API keys are configured")
 
+    if grounding:
+        # Use Groq's documented Responses API for server-side browser search.
+        # The Chat Completions browser-search path returned output_parse_failed
+        # for grounded JSON on recent production runs.
+        deadline = time.monotonic() + max(1.0, float(total_timeout))
+        last = "no usable response"
+        for model in GROQ_GROUNDED_MODELS:
+            for key in keys:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                instructions = (system or "") + (
+                    "\\nUse browser search. Cite only URLs actually returned by search. "
+                    "Return the requested JSON object only; never invent a URL or source."
+                )
+                payload = {
+                    "model": model,
+                    "instructions": instructions.strip(),
+                    "input": prompt,
+                    "tools": [{"type": "browser_search"}],
+                    "tool_choice": "required",
+                    "max_output_tokens": max(128, min(4096, int(max_completion_tokens))),
+                }
+                try:
+                    response = requests.post(
+                        "https://api.groq.com/openai/v1/responses",
+                        headers={"Authorization": f"Bearer {key}",
+                                 "Content-Type": "application/json"},
+                        json=payload,
+                        timeout=min(float(request_timeout), remaining),
+                    )
+                    if response.status_code != 200:
+                        hint = _provider_error_hint(response)
+                        last = f"{model}: HTTP {response.status_code}{hint}"
+                        print(f"Groq browser-search candidate unavailable: {model} HTTP {response.status_code}{hint}")
+                        if response.status_code in (401, 403):
+                            continue
+                        break
+                    data = response.json()
+                    content = data.get("output_text") or ""
+                    if not content:
+                        parts = []
+                        for item in data.get("output", []):
+                            if item.get("type") == "message":
+                                for part in item.get("content", []):
+                                    if part.get("type") == "output_text":
+                                        parts.append(part.get("text", ""))
+                        content = "\\n".join(parts)
+                    if content.strip():
+                        return extract_json(content) if json_out else content
+                    last = f"{model}: empty response"
+                except requests.Timeout:
+                    last = f"{model}: request timed out"
+                    continue
+                except Exception as exc:
+                    last = f"{model}: {type(exc).__name__}"
+                    continue
+        raise GroqUnavailableError(f"Groq browser-search Responses API failed: {last}")
+
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
