@@ -116,3 +116,5 @@ Run offline checks: `python -m unittest discover -v` (requires FFmpeg/ffprobe). 
 
 See [the post-production coverage audit](docs/POST_PRODUCTION_CAPABILITY_MATRIX.md) for the current A–Z capability
 status and real integration gaps.
+
+<!-- CI: Gemini-only five-key failover validation -->
