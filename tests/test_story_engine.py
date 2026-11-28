@@ -83,6 +83,17 @@ class StoryBlueprintTests(unittest.TestCase):
         self.assertTrue(any("opened_scene=1" in item and "payoff_scene" in item
                             for item in feedback))
 
+    def test_script_repair_feedback_explains_short_progression_and_missing_outro(self):
+        issues = [
+            "retention: actual scene 17 progression interval is 16.96s, outside 20-45s",
+            "missing documentary outro/payoff",
+        ]
+        feedback = pipeline._script_repair_feedback(issues)
+        self.assertTrue(any("scene 17's narration" in item and "at least 20 seconds" in item
+                            for item in feedback))
+        self.assertTrue(any("scene 18 narration must contain 20-30 words" in item
+                            for item in feedback))
+
     def test_script_prompt_requires_scene_one_to_open_the_registered_loop(self):
         blueprint = sample_blueprint()
         with patch("src.script.gemini", return_value=blueprint) as provider:
