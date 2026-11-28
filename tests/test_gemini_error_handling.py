@@ -33,7 +33,7 @@ class GeminiTextErrorTests(unittest.TestCase):
         self.assertEqual(4, post.call_count)
         self.assertIn("quota or rate limit", str(error.exception))
 
-    def test_permission_error_stops_key_rotation(self):
+    def test_permission_error_rotates_configured_gemini_keys(self):
         with patch.object(common, "_GEMINI_PAUSED_REASON", None), \
              patch.object(common, "_model_list", return_value=["model-a", "model-b"]), \
              patch.object(common, "env", side_effect=self._env), \
