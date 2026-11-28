@@ -60,17 +60,17 @@ class GeminiTextErrorTests(unittest.TestCase):
             self.assertIn("available-model", post.call_args_list[1].args[0])
             self.assertEqual("test-key-one", post.call_args_list[1].kwargs["params"]["key"])
 
-    def test_quota_failure_does_not_call_non_gemini_provider(self):
+    def test_quota_failure_uses_groq_then_free_fallbacks(self):
         with patch.object(common, "_gemini", side_effect=common.GeminiUnavailableError("quota")), \
-             patch.object(common, "_groq") as groq, \
-             patch.object(common, "_cloudflare") as cloudflare, \
-             patch.object(common, "_openrouter") as openrouter:
-            with self.assertRaises(common.GeminiUnavailableError):
-                common.gemini("prompt", json_out=False)
+             patch.object(common, "_groq", side_effect=common.GroqUnavailableError("quota")) as groq, \
+             patch.object(common, "_cloudflare", side_effect=common.CloudflareUnavailableError("quota")) as cloudflare, \
+             patch.object(common, "_openrouter", return_value="fallback") as openrouter:
+            result = common.gemini("prompt", json_out=False)
 
-        groq.assert_not_called()
-        cloudflare.assert_not_called()
-        openrouter.assert_not_called()
+        self.assertEqual("fallback", result)
+        groq.assert_called_once()
+        cloudflare.assert_called_once()
+        openrouter.assert_called_once()
 
 
 class GeminiTtsErrorTests(unittest.TestCase):
@@ -102,4 +102,5 @@ class GeminiTtsErrorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
 
