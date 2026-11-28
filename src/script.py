@@ -80,21 +80,20 @@ def fact_check(script):
     from .evidence import evidence_record, normalize_evidence
     import json
 
-    # Exclude storyboard and visual-plan fields from the provider request. Those
-    # fields add thousands of irrelevant tokens and have caused free-provider
-    # token-rate (413) errors before search could run.
     scenes = script.get("scenes", []) if isinstance(script, dict) else []
     compact_scenes = [
-        {"scene": index, "title": str(scene.get("title", ""))[:160],
+        {"scene": index, "act": int(scene.get("act", 0) or 0),
+         "title": str(scene.get("title", ""))[:160],
          "narration": str(scene.get("narration", ""))[:1800]}
         for index, scene in enumerate(scenes, 1) if isinstance(scene, dict)
     ]
     prompt = f"""Use the live web-search tool to check these documentary narration scenes.
 For each material factual claim you can support from a search result, return a concise record with its
 original scene number, exact claim, supporting evidence from the result, source name, direct HTTPS URL,
-and confidence (high/medium/low). Cover at least 8 distinct scenes spanning all acts only when sources
-support them. Omit unsupported claims; never invent facts, links, titles, quotes, or search results.
-If a source contradicts the narration, include a short correction in changes as an object with scene,
+and confidence (high/medium/low). Return claims from at least 8 distinct scenes and include supported
+claims from Act I, Act II and Act III. Search all three acts; do not omit a later act merely because its
+claims are less prominent. Omit unsupported claims; never invent facts, links, titles, quotes, or search
+results. If a source contradicts the narration, include a short correction in changes as an object with scene,
 replacement, and source_url. Do not rewrite or return the storyboard. Return ONLY JSON:
 {{"claims":[{{"scene":1,"claim":"","evidence":"","source":"","source_url":"https://...","confidence":"medium"}}],"changes":[]}}
 This is automated search assistance, not independent human verification.
@@ -104,23 +103,56 @@ SCENES:
     try:
         out = gemini(prompt, grounding=True, temperature=0.2,
                      max_output_tokens=4096, max_completion_tokens=1600)
-        claims, reason = normalize_evidence(out, len(script.get("scenes", [])))
+        claims, reason = normalize_evidence(out, len(scenes))
         if claims:
-            result = dict(script)
-            # Apply only replacements tied to a validated claim/source row.
-            for correction in out.get("changes", []):
-                if not isinstance(correction, dict):
-                    continue
+            scene_acts = {
+                int(scene.get("number", index) or index): int(scene.get("act", 0) or 0)
+                for index, scene in enumerate(scenes, 1) if isinstance(scene, dict)
+            }
+            covered = {scene_acts.get(row["scene"], 0) for row in claims}
+            missing_acts = sorted({1, 2, 3} - covered)
+            outputs = [out]
+            if missing_acts:
+                targeted = [row for row in compact_scenes if row["act"] in missing_acts]
+                followup = f"""Use live web search to find reliable sources for factual claims in the missing documentary act(s) below.
+Return at least one material, directly supported claim for EACH listed act, using the exact original scene
+number, claim, supporting evidence, source name, direct HTTPS URL and confidence. Do not reuse an unrelated
+source, invent a claim, or change narration. If no reliable source supports an act, return no claim for it.
+Return ONLY JSON: {{"claims":[{{"scene":15,"claim":"","evidence":"","source":"","source_url":"https://...","confidence":"medium"}}],"changes":[]}}
+MISSING ACTS: {missing_acts}
+SCENES:
+{json.dumps(targeted, ensure_ascii=False, separators=(',', ':'))}"""
                 try:
-                    scene_no = int(correction.get("scene", 0))
-                except (TypeError, ValueError):
-                    continue
-                replacement = " ".join(str(correction.get("replacement", "")).split())
-                source_url = str(correction.get("source_url", "")).strip()
-                if (replacement and 1 <= scene_no <= len(result.get("scenes", []))
-                        and any(row["scene"] == scene_no and row["source_url"] == source_url
-                                for row in claims)):
-                    result["scenes"][scene_no - 1]["narration"] = replacement
+                    supplement = gemini(followup, grounding=True, temperature=0.2,
+                                        max_output_tokens=2048, max_completion_tokens=1000)
+                    outputs.append(supplement)
+                    combined = []
+                    for response in outputs:
+                        if isinstance(response, dict) and isinstance(response.get("claims"), list):
+                            combined.extend(response["claims"])
+                    claims, reason = normalize_evidence({"claims": combined}, len(scenes))
+                    if claims:
+                        covered = {scene_acts.get(row["scene"], 0) for row in claims}
+                        if {1, 2, 3} - covered:
+                            print("fact_check still lacks source-linked evidence for acts:",
+                                  sorted({1, 2, 3} - covered))
+                except Exception as exc:
+                    print("act-specific fact-check supplement unavailable:", type(exc).__name__)
+            result = dict(script)
+            for response in outputs:
+                for correction in response.get("changes", []) if isinstance(response, dict) else []:
+                    if not isinstance(correction, dict):
+                        continue
+                    try:
+                        scene_no = int(correction.get("scene", 0))
+                    except (TypeError, ValueError):
+                        continue
+                    replacement = " ".join(str(correction.get("replacement", "")).split())
+                    source_url = str(correction.get("source_url", "")).strip()
+                    if (replacement and 1 <= scene_no <= len(result.get("scenes", []))
+                            and any(row["scene"] == scene_no and row["source_url"] == source_url
+                                    for row in claims)):
+                        result["scenes"][scene_no - 1]["narration"] = replacement
             result["sources"] = list(dict.fromkeys(row["source_url"] for row in claims))
             result["_fact_check"] = evidence_record(claims)
             return result
