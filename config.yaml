@@ -44,7 +44,7 @@ story:
   hook_max_seconds: 5
   min_progression_seconds: 20
   max_progression_seconds: 45
-  min_outro_seconds: 8
+  min_outro_seconds: 5
   max_outro_seconds: 20
 
 publishing:
