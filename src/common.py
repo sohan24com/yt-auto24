@@ -1,4 +1,4 @@
-import atexit, json, os, re, time, datetime as dt, tempfile
+import atexit, json, os, random, re, time, datetime as dt, tempfile
 from pathlib import Path
 import requests, yaml
 
@@ -105,12 +105,17 @@ def _provider_error_hint(response):
     return f" ({', '.join(parts)})" if parts else ""
 
 
-def _provider_error_message(response, secrets=()):
-    """Return a short, sanitized provider message without exposing credentials."""
+def _provider_payload(response):
     try:
         payload = response.json()
     except Exception:
-        return "provider error message unavailable"
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _provider_error_message(response, secrets=(), payload=None):
+    """Return a short, sanitized provider message without exposing credentials."""
+    payload = _provider_payload(response) if payload is None else payload
     error = payload.get("error") if isinstance(payload, dict) else None
     if not isinstance(error, dict):
         errors = payload.get("errors") if isinstance(payload, dict) else None
@@ -125,10 +130,47 @@ def _provider_error_message(response, secrets=()):
     return message[:500] or "provider error message unavailable"
 
 
+def _provider_retry_delay(payload, message=""):
+    """Read Google's RetryInfo duration in seconds when it is present."""
+    def find_retry(value):
+        if isinstance(value, dict):
+            delay = value.get("retryDelay")
+            if isinstance(delay, str):
+                match = re.fullmatch(r"\s*(\d+(?:\.\d+)?)s\s*", delay)
+                if match:
+                    return float(match.group(1))
+            for child in value.values():
+                found = find_retry(child)
+                if found is not None:
+                    return found
+        elif isinstance(value, list):
+            for child in value:
+                found = find_retry(child)
+                if found is not None:
+                    return found
+        return None
+
+    delay = find_retry(payload)
+    if delay is not None:
+        return delay
+    match = re.search(r"(?:retry|try again)[^0-9]{0,30}(\d+(?:\.\d+)?)\s*s\b", message, re.I)
+    return float(match.group(1)) if match else None
+
+
+def _provider_zero_limit(payload, message=""):
+    body = json.dumps(payload, ensure_ascii=False).lower()
+    pattern = r"limit[\"']?\s*[:=]\s*[\"']?0(?:\D|$)"
+    return bool(re.search(pattern, body) or re.search(pattern, message.lower()))
+
+
 # Keep this allowlist limited to models whose standard text API has a documented free tier.
 # Model discovery only decides which supported allowlisted IDs to try; it never enables paid IDs.
 GEMINI_MODEL_PREFERENCES = {
-    "general": ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite"),
+    "general": (
+        "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite",
+        "gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.8-flash",
+        "gemini-flash-latest",
+    ),
     "grounding": ("gemini-2.5-flash", "gemini-2.5-flash-lite"),
 }
 GEMINI_FALLBACK_MODELS = GEMINI_MODEL_PREFERENCES["general"]
@@ -140,11 +182,15 @@ _MODEL_CATALOG = None
 _MODEL_DISCOVERY_FAILED = False
 _GEMINI_MODEL_COUNTS = {}
 _GEMINI_MODEL_COUNTS_LOGGED = False
+_GEMINI_TOTAL_CALLS = 0
+_GEMINI_DISABLED_MODELS = set()
+_GEMINI_DISABLED_PAIRS = set()
+_GEMINI_429_KEYS_BY_MODEL = {}
 
 
 def _model_is_allowed(name):
     lowered = name.lower()
-    if "pro" in lowered:
+    if "pro" in lowered or "omni" in lowered:
         return False
     return not any(lowered == blocked or lowered.startswith(blocked + "-")
                    for blocked in GEMINI_BLOCKED_MODELS)
@@ -177,7 +223,8 @@ def _list_models(keys):
                         continue
                     name = str(model.get("name", "")).removeprefix("models/")
                     methods = model.get("supportedGenerationMethods", [])
-                    if name and isinstance(methods, list) and "generateContent" in methods:
+                    if (name and _model_is_allowed(name) and isinstance(methods, list)
+                            and "generateContent" in methods):
                         catalog[name] = methods
                 next_token = payload.get("nextPageToken")
                 if not next_token:
@@ -231,7 +278,7 @@ def _model_list(keys, grounding=False):
     if mode in _MODELS:
         return _MODELS[mode]
 
-    if isinstance(keys, str):
+    if isinstance(keys, str):  # Keep direct callers convenient for a single-key check.
         keys = [(1, keys)]
     _list_models(keys)
     preferred = GEMINI_MODEL_PREFERENCES[mode]
@@ -243,7 +290,8 @@ def _model_list(keys, grounding=False):
         models = [name for name in preferred if _model_is_allowed(name)]
     _MODELS[mode] = models
     for model in models:
-        _GEMINI_MODEL_COUNTS.setdefault(model, {"success": 0, "404": 0, "429": 0})
+        _GEMINI_MODEL_COUNTS.setdefault(
+            model, {"success": 0, "404": 0, "429": 0, "503": 0})
     print(f"Gemini {mode} models to try: {models}")
     return models
 
@@ -254,34 +302,29 @@ def _log_gemini_model_counts():
         return
     _GEMINI_MODEL_COUNTS_LOGGED = True
     if not _GEMINI_MODEL_COUNTS:
-        print("Gemini model outcomes: no model attempts")
+        print("Gemini model outcomes: no model attempts; total Gemini generation calls=0")
         return
     details = "; ".join(
-        f"{model}: success={counts['success']}, 404={counts['404']}, 429={counts['429']}"
+        f"{model}: success={counts.get('success', 0)}, 404={counts.get('404', 0)}, "
+        f"429={counts.get('429', 0)}, 503={counts.get('503', 0)}"
         for model, counts in _GEMINI_MODEL_COUNTS.items())
-    print("Gemini model outcomes: " + details)
+    print(f"Gemini model outcomes: {details}; total Gemini generation calls={_GEMINI_TOTAL_CALLS}")
 
 
 atexit.register(_log_gemini_model_counts)
-
 
 class GeminiUnavailableError(RuntimeError):
     """Raised after bounded attempts across the configured Gemini keys and models."""
 
 
-# Gemini is available at the start of each run; failures may pause it later.
+# Retained for compatibility with existing callers that inspect run state.
 _GEMINI_PAUSED_REASON = ""
-_GEMINI_KEY_COUNT_LOGGED = False
 _GEMINI_KEY_COUNT_LOGGED = False
 
 
 def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
            tries=None, request_timeout=90, total_timeout=300, max_output_tokens=32000):
-    global _GEMINI_PAUSED_REASON, _GEMINI_KEY_COUNT_LOGGED
-    if _GEMINI_PAUSED_REASON:
-        raise GeminiUnavailableError(
-            f"Gemini paused for this run after {_GEMINI_PAUSED_REASON}"
-        )
+    global _GEMINI_KEY_COUNT_LOGGED, _GEMINI_TOTAL_CALLS
     body = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {"maxOutputTokens": max(128, min(32000, int(max_output_tokens)))},
@@ -307,109 +350,144 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
     if not keys:
         raise GeminiUnavailableError("No Gemini API keys are configured")
 
-    models = _model_list(keys, grounding=grounding)
+    models = [model for model in _model_list(keys, grounding=grounding)
+              if model not in _GEMINI_DISABLED_MODELS]
     if not models:
-        raise GeminiUnavailableError("No Gemini models are available to try")
+        raise GeminiUnavailableError("Gemini run-level circuit breaker skipped all models")
 
     deadline = time.monotonic() + max(1.0, float(total_timeout))
     attempts = 0
     last = "no usable response"
     status_counts = {}
     permission_denied = False
-
     for model in models:
-        overloaded = False
+        if model in _GEMINI_DISABLED_MODELS:
+            continue
+        retry_after_key_429 = _GEMINI_429_KEYS_BY_MODEL.setdefault(model, set())
+        key_slots = {index for index, _ in keys}
+        stop_model = False
         for key_index, key in keys:
+            pair = (key_index, model)
+            if pair in _GEMINI_DISABLED_PAIRS:
+                print(f"Gemini key/model skipped for this run: key {key_index}/5, model {model}")
+                continue
             if tries is not None and attempts >= tries:
                 break
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                break
-            attempts += 1
-            gc = dict(body["generationConfig"])
-            if not model.startswith("gemini-3"):
-                gc["temperature"] = temperature
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-            try:
-                r = requests.post(
-                    url, params={"key": key},
-                    json=dict(body, generationConfig=gc),
-                    timeout=min(float(request_timeout), remaining),
-                )
-                if r.status_code == 200:
-                    parts = r.json()["candidates"][0]["content"]["parts"]
-                    text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
-                    result = extract_json(text) if json_out else text
-                    _GEMINI_MODEL_COUNTS.setdefault(
-                        model, {"success": 0, "404": 0, "429": 0})["success"] += 1
-                    return result
+            model_503_retries = 0
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0 or (tries is not None and attempts >= tries):
+                    break
+                attempts += 1
+                _GEMINI_TOTAL_CALLS += 1
+                gc = dict(body["generationConfig"])
+                if not model.startswith("gemini-3"):
+                    gc["temperature"] = temperature
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+                try:
+                    r = requests.post(
+                        url, params={"key": key},
+                        json=dict(body, generationConfig=gc),
+                        timeout=min(float(request_timeout), remaining),
+                    )
+                    if r.status_code == 200:
+                        parts = r.json()["candidates"][0]["content"]["parts"]
+                        text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
+                        result = extract_json(text) if json_out else text
+                        _GEMINI_MODEL_COUNTS.setdefault(
+                            model, {"success": 0, "404": 0, "429": 0, "503": 0})["success"] += 1
+                        return result
 
-                status = int(r.status_code)
-                status_counts[status] = status_counts.get(status, 0) + 1
-                if status in (404, 429):
-                    _GEMINI_MODEL_COUNTS.setdefault(
-                        model, {"success": 0, "404": 0, "429": 0})[str(status)] += 1
-                kinds = {
-                    400: "request format or model configuration",
-                    401: "API key authentication",
-                    403: "project permission or free-tier access",
-                    404: "model or endpoint configuration",
-                    429: "quota or rate limit",
-                }
-                kind = kinds.get(status, "temporary service failure" if status >= 500 else "HTTP error")
-                last = f"{model}: HTTP {status} ({kind})"
-                if status == 429:
-                    message = _provider_error_message(r, (secret for _, secret in keys))
-                    print(f"Gemini rate limited: key {key_index}/5, model {model}, "
-                          f"HTTP 429, provider error: {message}")
-                else:
+                    status = int(r.status_code)
+                    status_counts[status] = status_counts.get(status, 0) + 1
+                    if status in (404, 429, 503):
+                        _GEMINI_MODEL_COUNTS.setdefault(
+                            model, {"success": 0, "404": 0, "429": 0, "503": 0})[str(status)] += 1
+                    kinds = {
+                        400: "request format or model configuration",
+                        401: "API key authentication",
+                        403: "project permission or free-tier access",
+                        404: "model or endpoint configuration",
+                        429: "quota or rate limit",
+                        503: "temporary service capacity",
+                    }
+                    kind = kinds.get(status, "temporary service failure" if status >= 500 else "HTTP error")
+                    last = f"{model}: HTTP {status} ({kind})"
+                    if status == 429:
+                        payload = _provider_payload(r)
+                        message = _provider_error_message(
+                            r, (secret for _, secret in keys), payload=payload)
+                        print(f"Gemini rate limited: key {key_index}/5, model {model}, "
+                              f"HTTP 429, provider error: {message}")
+                        retry_after_key_429.add(key_index)
+                        if _provider_zero_limit(payload, message):
+                            _GEMINI_DISABLED_MODELS.add(model)
+                            print(f"Gemini model skipped for this run: {model} (provider limit: 0)")
+                            stop_model = True
+                            break
+                        if "per day" in message.lower():
+                            _GEMINI_DISABLED_PAIRS.add(pair)
+                            print(f"Gemini key/model disabled for this run: key {key_index}/5, model {model} (per day quota)")
+                            break
+                        if "per minute" in message.lower():
+                            delay = _provider_retry_delay(payload, message)
+                            if delay is not None and delay > 0:
+                                wait = min(delay, max(0.0, deadline - time.monotonic()))
+                                print(f"Gemini per-minute retry delay: {wait:.1f}s, then next key")
+                                time.sleep(wait)
+                            else:
+                                print("Gemini per-minute retryDelay unavailable; moving to next key")
+                        break
+
                     print(f"Gemini candidate unavailable: HTTP {status} ({kind})")
+                    if status == 404:
+                        _GEMINI_DISABLED_MODELS.add(model)
+                        print(f"Gemini model skipped for this run: {model} (HTTP 404)")
+                        stop_model = True
+                        break
+                    if status == 503:
+                        if model_503_retries < 2:
+                            model_503_retries += 1
+                            delay = random.uniform(2.0, 4.0)
+                            wait = min(delay, max(0.0, deadline - time.monotonic()))
+                            print(f"Gemini HTTP 503 retry {model_503_retries}/2 after {wait:.1f}s: {model}")
+                            time.sleep(wait)
+                            continue
+                        print(f"Gemini HTTP 503 retry limit reached; moving to next model: {model}")
+                        stop_model = True
+                        break
+                    if status == 403:
+                        permission_denied = True
+                        stop_model = True
+                        break
+                    if status == 401:
+                        break
+                    if status == 400:
+                        stop_model = True
+                        break
+                    break
+                except requests.Timeout:
+                    last = f"{model}: request timed out"
+                    break
+                except Exception as ex:
+                    last = f"{model}: {type(ex).__name__}"
+                    break
 
-                if status == 503 or status in (500, 502, 504):
-                    # Capacity errors are model-wide; move to another model instead of
-                    # asking every account to hit the same overloaded endpoint.
-                    overloaded = True
-                    break
-                if status in (400, 404):
-                    # Request/model issues are not repaired by rotating credentials.
-                    break
-                if status == 403:
-                    # Permission/free-tier failures are configuration errors, not rate limits.
-                    permission_denied = True
-                    break
-                if status == 429:
-                    # Try the other explicitly configured Gemini credentials.
-                    # These may belong to separate Google projects; stay Gemini-only.
-                    continue
-
-                if status == 401:
-                    # A distinct configured key can fix an invalid credential.
-                    continue
-                if status >= 400:
-                    break
-            except requests.Timeout:
-                last = f"{model}: request timed out"
-                continue
-            except Exception as ex:
-                last = f"{model}: {type(ex).__name__}"
-                continue
-
+            if stop_model:
+                break
         if permission_denied:
             break
+        if key_slots and key_slots <= retry_after_key_429:
+            _GEMINI_DISABLED_MODELS.add(model)
+            print(f"Gemini model skipped for this run: {model} (all configured keys returned HTTP 429)")
         if tries is not None and attempts >= tries:
-            break
-        if _GEMINI_PAUSED_REASON:
             break
         if deadline - time.monotonic() <= 0:
             break
-        if overloaded:
-            time.sleep(min(2.0, max(0.0, deadline - time.monotonic())))
 
     summary = ", ".join(f"HTTP {code} x{count}" for code, count in sorted(status_counts.items()))
     if not summary:
         summary = f"{attempts} request attempt(s)"
-    if status_counts.get(429):
-        _GEMINI_PAUSED_REASON = "quota or rate limit"
     raise GeminiUnavailableError(
         f"Gemini unavailable after {attempts} bounded attempt(s) ({summary}); last response: {last}"
     )
@@ -681,13 +759,47 @@ def _openrouter(prompt, system=None, json_out=True, temperature=0.9,
 def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
            tries=None, request_timeout=90, total_timeout=300,
            max_output_tokens=32000, max_completion_tokens=4096):
-    """Use only configured Gemini API keys and Gemini models for text generation."""
-    return _gemini(
-        prompt, system=system, grounding=grounding, json_out=json_out,
-        temperature=temperature, tries=tries,
-        request_timeout=request_timeout, total_timeout=total_timeout,
-        max_output_tokens=max_output_tokens,
-    )
+    """Prefer Gemini, then the configured Groq and free OpenRouter fallbacks."""
+    try:
+        return _gemini(
+            prompt, system=system, grounding=grounding, json_out=json_out,
+            temperature=temperature, tries=tries,
+            request_timeout=request_timeout, total_timeout=total_timeout,
+            max_output_tokens=max_output_tokens,
+        )
+    except GeminiUnavailableError as gemini_error:
+        print("Gemini unavailable; trying Groq fallback.")
+        try:
+            return _groq(
+                prompt, system=system, json_out=json_out, temperature=temperature,
+                grounding=grounding, request_timeout=min(request_timeout, 30),
+                total_timeout=min(total_timeout, 90),
+                max_completion_tokens=max_completion_tokens,
+            )
+        except GroqUnavailableError as groq_error:
+            if grounding:
+                raise GeminiUnavailableError(
+                    "Grounded generation requires Gemini or Groq search; both are unavailable."
+                ) from gemini_error
+            print("Groq unavailable; trying Cloudflare fallback.")
+            try:
+                return _cloudflare(
+                    prompt, system=system, json_out=json_out,
+                    temperature=temperature, request_timeout=min(request_timeout, 30),
+                )
+            except CloudflareUnavailableError as cloudflare_error:
+                print("Cloudflare unavailable; trying OpenRouter free fallback.")
+                try:
+                    return _openrouter(
+                        prompt, system=system, json_out=json_out,
+                        temperature=temperature, request_timeout=min(request_timeout, 30),
+                    )
+                except OpenRouterUnavailableError as openrouter_error:
+                    raise GeminiUnavailableError(
+                        "Gemini, Groq, Cloudflare, and OpenRouter are unavailable: "
+                        f"{type(gemini_error).__name__}, {type(groq_error).__name__}, "
+                        f"{type(cloudflare_error).__name__}, {type(openrouter_error).__name__}"
+                    ) from gemini_error
 
 
 # ---------- notifications ----------
@@ -714,5 +826,6 @@ def notify(msg):
                           data={"chat_id": chat, "text": msg[:3500]}, timeout=20)
         except Exception:
             pass
+
 
 
