@@ -55,25 +55,30 @@ class PipelineTests(unittest.TestCase):
         return stack
 
     def test_model_list_only_uses_free_tier_text_models(self):
-        common._MODELS = None
+        common._MODELS = {}
+        common._MODEL_CATALOG = None
+        common._MODEL_DISCOVERY_FAILED = False
         api_models = {
             "models": [
-                {"name": "models/gemini-3.8-flash", "supportedGenerationMethods": ["generateContent"]},
-                {"name": "models/gemini-3.6-flash", "supportedGenerationMethods": ["generateContent"]},
+                {"name": "models/gemini-3.5-flash-lite", "supportedGenerationMethods": ["generateContent"]},
+                {"name": "models/gemini-3.1-flash-lite", "supportedGenerationMethods": ["generateContent"]},
                 {"name": "models/gemini-2.5-flash-lite", "supportedGenerationMethods": ["generateContent"]},
-                {"name": "models/gemini-3.1-flash-tts-preview", "supportedGenerationMethods": ["generateContent"]},
+                {"name": "models/gemini-2.5-pro", "supportedGenerationMethods": ["generateContent"]},
+                {"name": "models/gemini-2-flash", "supportedGenerationMethods": ["generateContent"]},
+                {"name": "models/gemini-2-flash-lite", "supportedGenerationMethods": ["generateContent"]},
             ]
         }
-        with (
-            patch("src.common.cfg", return_value={
-                "gemini_model": "gemini-3.8-flash",
-                "gemini_fallbacks": ["gemini-3.7-flash", "gemini-3.5-flash"]}),
-            patch("src.common.requests.get", return_value=SimpleNamespace(
-                json=lambda: api_models, raise_for_status=lambda: None)),
-        ):
+        with patch("src.common.requests.get", return_value=SimpleNamespace(
+                json=lambda: api_models, raise_for_status=lambda: None)):
             models = common._model_list("test-key")
-        self.assertEqual(["gemini-3.6-flash", "gemini-2.5-flash-lite"], models)
-        common._MODELS = None
+            grounding_models = common._model_list("test-key", grounding=True)
+        self.assertEqual([
+            "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite"
+        ], models)
+        self.assertEqual(["gemini-2.5-flash-lite"], grounding_models)
+        common._MODELS = {}
+        common._MODEL_CATALOG = None
+        common._MODEL_DISCOVERY_FAILED = False
 
     def test_gemini_stops_at_quota_and_falls_back_to_groq(self):
         gemini_quota = self._gemini_response(429, text="quota")
@@ -141,15 +146,16 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual({"ok": True}, result)
         self.assertTrue(groq.call_args.kwargs["grounding"])
 
-    def test_gemini_stops_key_rotation_on_quota(self):
+    def test_gemini_rotates_to_next_key_on_quota(self):
         with self._gemini_test_env(), \
              patch("src.common._model_list", return_value=["model-a"]), \
              patch("src.common.requests.post", return_value=self._gemini_response(429, text="quota")) as post:
             with self.assertRaises(common.GeminiUnavailableError) as error:
                 common.gemini("test prompt", request_timeout=1, total_timeout=5)
-        self.assertEqual(1, post.call_count)
-        self.assertEqual("test-key-1", post.call_args.kwargs["params"]["key"])
-        self.assertIn("HTTP 429 x1", str(error.exception))
+        self.assertEqual(2, post.call_count)
+        self.assertEqual("test-key-1", post.call_args_list[0].kwargs["params"]["key"])
+        self.assertEqual("test-key-2", post.call_args_list[1].kwargs["params"]["key"])
+        self.assertIn("HTTP 429 x2", str(error.exception))
 
     def test_gemini_moves_to_next_model_on_capacity_error(self):
         success = {"candidates": [{"content": {"parts": [{"text": '{"ok": true}'}]}}]}
