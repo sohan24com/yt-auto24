@@ -30,6 +30,32 @@ class PipelineTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def test_assemble_accepts_tuple_shot_decision_and_uses_default_movement(self):
+        audio = SimpleNamespace(plan=Mock(return_value=[]), credits=Mock(return_value=[]), diagnostics=[])
+        scene = {"emotion": "curious", "visual_plan": {"camera_movement": "pan_left"}}
+        with (
+            patch("src.edit._shot_is_complete", return_value=False),
+            patch("src.edit.render_shot") as render,
+            patch("src.edit._source_label", return_value="ILLUSTRATIVE"),
+            patch("src.edit.make_ass"),
+            patch("src.edit.audio_director.AudioDirector", return_value=audio),
+            patch("src.edit.make_music"),
+            patch("src.edit.make_ambience"),
+            patch("src.edit.make_whoosh"),
+            patch("src.edit.make_impact"),
+            patch("src.edit.director.sound_cues", return_value=[]),
+            patch("src.edit.mix_audio"),
+            patch("src.edit.run"),
+            patch("src.edit.cfg", return_value={"audio": {}}),
+        ):
+            edit.assemble(
+                [scene], [4.0], [[4.0]], [[{"path": self.source}]],
+                self.source, self.wd, self.wd / "final.mp4",
+                shot_decisions=[[("search query", "alternate query")]],
+            )
+        self.assertEqual("push_in", render.call_args.kwargs["movement"])
+        self.assertEqual("pan_left", render.call_args.kwargs["camera_movement"])
+
     def test_ffprobe_accepts_complete_landscape_and_rejects_wrong_duration(self):
         self.assertEqual([], pipeline.media_problems(
             self.source, expected_duration=4.0, min_bytes=0))
