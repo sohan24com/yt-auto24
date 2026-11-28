@@ -26,7 +26,7 @@ STORY CONTRACT
 - Act I establishes the object, stakes and investigation; Act II develops evidence and complications; Act III delivers the evidence-bounded answer, meaning and concise natural CTA.
 - Create 1-3 open loops, each with a unique ID, opening scene, question and a later explicit payoff scene before scene 18.
 - Every scene must move the story forward with new information, a reveal, an obstacle, a consequence or a payoff.
-- Plan 20-45 seconds of spoken progression for scenes 2-18. Put a target_duration_seconds estimate in each plan; actual audio timing is checked after voice generation.
+- Plan 20-45 seconds of spoken progression for scenes 2-17. Scene 18 is a concise 8-20 second outro. Put a target_duration_seconds estimate in each plan; actual audio timing is checked after voice generation.
 - Use a pattern interrupt only when it clarifies or changes the viewer's understanding; do not add empty spectacle.
 - Deliver a satisfying resolution in scene 17, then a brief thank-you/Like/Comment/Subscribe/related-next-video invitation in scene 18.
 - NARRATION LENGTH IS A HARD CONSTRAINT: target {target_total} words total; never exceed {v['words_max']} words.
