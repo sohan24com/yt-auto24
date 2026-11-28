@@ -124,6 +124,8 @@ def build_once(wd, validation_feedback=None):
     script = None
     problems = list(validation_feedback or [])
     script = state.get("script")
+    if not isinstance(script, dict):
+        script = state.get("script_draft")
     if not isinstance(script, dict) or S.valid(script) or validation_feedback:
         if validation_feedback:
             state.pop("geometry", None)
@@ -131,13 +133,20 @@ def build_once(wd, validation_feedback=None):
             state.pop("voice", None)
             for artifact in ("voice.wav", "final.mp4", "audio_report.json", "subs.ass"):
                 (wd / artifact).unlink(missing_ok=True)
-        previous_draft = None
+        previous_draft = state.get("script_draft")
+        if not isinstance(previous_draft, dict):
+            previous_draft = script if isinstance(script, dict) else None
+        problems = list(state.get("script_feedback") or validation_feedback or [])
         max_attempts = 5
         for attempt in range(1, max_attempts + 1):
             script = S.write_script(topic, validation_feedback=problems,
                                     previous_draft=previous_draft)
             problems = list(S.valid(script))
             if not problems:
+                if isinstance(script, dict):
+                    state["script_draft"] = script
+                    state["script_feedback"] = []
+                    _save_state(wd, state)
                 break
             print(f"script rejected (draft {attempt}/{max_attempts}):", problems)
             previous_draft = script if isinstance(script, dict) else None
@@ -150,6 +159,10 @@ def build_once(wd, validation_feedback=None):
                 except (IndexError, ValueError):
                     reported_count = None
                 problems.append(_narration_budget_feedback(script, limits, reported_count))
+            if isinstance(script, dict):
+                state["script_draft"] = script
+                state["script_feedback"] = list(problems)
+                _save_state(wd, state)
         else:
             raise RuntimeError(f"could not produce a valid script: {problems}")
         checked = S.fact_check(script)
@@ -160,6 +173,8 @@ def build_once(wd, validation_feedback=None):
             checked[k] = script.get(k, checked.get(k))
         checked = STORY.attach_evidence(checked, checked.get("_fact_check", {}))
         script = checked
+        state.pop("script_draft", None)
+        state.pop("script_feedback", None)
         state["script"] = script
         _save_state(wd, state)
     checked = script

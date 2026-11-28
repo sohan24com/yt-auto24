@@ -22,7 +22,22 @@ class CloudflareFallbackTests(unittest.TestCase):
         args, kwargs = post.call_args
         self.assertIn("/accounts/test-account/ai/v1/chat/completions", args[0])
         self.assertEqual(kwargs["headers"]["Authorization"], "Bearer test-token")
-        self.assertEqual(kwargs["json"]["model"], "@cf/meta/llama-3.1-8b-instruct")
+        self.assertEqual(kwargs["json"]["model"], "@cf/google/gemma-4-26b-a4b-it")
+
+    def test_deprecated_cloudflare_model_error_code_is_reported_without_body(self):
+        response = unittest.mock.Mock()
+        response.status_code = 410
+        response.json.return_value = {
+            "success": False,
+            "errors": [{"code": 5028, "message": "model retired; secret value must not leak"}],
+        }
+        env_values = {"CLOUDFLARE_API_TOKEN": "test-secret", "CLOUDFLARE_ACCOUNT_ID": "test-account"}
+        with patch.object(common, "env", side_effect=lambda name, required=True: env_values.get(name, "")), \
+             patch.object(common.requests, "post", return_value=response):
+            with self.assertRaisesRegex(common.CloudflareUnavailableError, r"HTTP 410 \(code=5028\)") as error:
+                common._cloudflare("Return JSON")
+        self.assertNotIn("secret value must not leak", str(error.exception))
+        self.assertNotIn("test-secret", str(error.exception))
 
     def test_cloudflare_is_skipped_without_both_secrets(self):
         with patch.object(common, "env", return_value=""):

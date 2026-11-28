@@ -30,6 +30,21 @@ class CheckpointAndSafetyTests(unittest.TestCase):
         self.assertIn("Add at least 163", feedback)
         self.assertIn("Do not compress", feedback)
 
+    def test_interrupted_script_retry_persists_invalid_draft_and_feedback(self):
+        draft = {"title_promise": "A documented mystery", "scenes": [{"narration": "draft text"}]}
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch("src.pipeline.cfg", return_value={"video": {"words_min": 1150, "words_max": 1400}}), \
+             patch("src.pipeline.F.reset"), \
+             patch("src.pipeline.T.choose_topic", return_value={"topic": "A topic", "angle": "A question"}), \
+             patch("src.pipeline.S.write_script", side_effect=[draft, RuntimeError("free quota exhausted")]) as write, \
+             patch("src.pipeline.S.valid", return_value=["word count 872"]):
+            with self.assertRaisesRegex(RuntimeError, "free quota exhausted"):
+                pipeline.build_once(tmp)
+            saved = pipeline._load_state(tmp)
+            self.assertEqual(draft, saved.get("script_draft"), saved)
+            self.assertTrue(any("Add at least 163" in item for item in saved["script_feedback"]))
+            self.assertEqual(draft, write.call_args_list[1].kwargs["previous_draft"])
+
     def test_checkpoint_round_trip_and_atomic_replace(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {"version": pipeline.CHECKPOINT_VERSION, "stage": "voice", "durations": [3.2]}

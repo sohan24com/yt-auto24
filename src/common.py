@@ -87,6 +87,24 @@ def extract_json(text):
     return json.loads(text[s:e + 1])
 
 
+def _provider_error_hint(response):
+    """Expose machine-readable provider error fields; never log bodies or secrets."""
+    try:
+        payload = response.json()
+    except Exception:
+        return ""
+    error = payload.get("error") if isinstance(payload, dict) else None
+    if not isinstance(error, dict):
+        errors = payload.get("errors") if isinstance(payload, dict) else None
+        error = errors[0] if isinstance(errors, list) and errors and isinstance(errors[0], dict) else {}
+    parts = []
+    for name in ("code", "type", "param"):
+        value = error.get(name) if isinstance(error, dict) else None
+        if value is not None and re.fullmatch(r"[A-Za-z0-9_.-]{1,48}", str(value)):
+            parts.append(f"{name}={value}")
+    return f" ({', '.join(parts)})" if parts else ""
+
+
 # Keep this allowlist limited to models whose standard text API has a documented free tier.
 # Model discovery only decides which supported allowlisted IDs to try; it never enables paid IDs.
 FREE_GEMINI_MODELS = (
@@ -312,8 +330,9 @@ def _groq(prompt, system=None, json_out=True, temperature=0.9, grounding=False,
 
                 status = int(response.status_code)
                 status_counts[status] = status_counts.get(status, 0) + 1
-                last = f"{model}: HTTP {status}"
-                print(f"Groq candidate unavailable: {model} HTTP {status}")
+                hint = _provider_error_hint(response)
+                last = f"{model}: HTTP {status}{hint}"
+                print(f"Groq candidate unavailable: {model} HTTP {status}{hint}")
                 if status in (401, 403):
                     # Rotate a rejected credential; do not log or expose its value.
                     continue
@@ -369,15 +388,16 @@ def _cloudflare(prompt, system=None, json_out=True, temperature=0.9,
             url,
             headers={"Authorization": f"Bearer {token}",
                      "Content-Type": "application/json"},
-            json={"model": "@cf/meta/llama-3.1-8b-instruct",
+            json={"model": "@cf/google/gemma-4-26b-a4b-it",
                   "messages": messages, "temperature": temperature,
                   "max_tokens": 4096},
             timeout=float(request_timeout),
         )
         if response.status_code != 200:
-            print(f"Cloudflare candidate unavailable: HTTP {response.status_code}")
+            hint = _provider_error_hint(response)
+            print(f"Cloudflare candidate unavailable: HTTP {response.status_code}{hint}")
             raise CloudflareUnavailableError(
-                f"Cloudflare Workers AI returned HTTP {response.status_code}"
+                f"Cloudflare Workers AI returned HTTP {response.status_code}{hint}"
             )
         content = (response.json().get("choices", [{}])[0]
                    .get("message", {}).get("content") or "")
@@ -426,9 +446,10 @@ def _openrouter(prompt, system=None, json_out=True, temperature=0.9,
             timeout=float(request_timeout),
         )
         if response.status_code != 200:
-            print(f"OpenRouter candidate unavailable: HTTP {response.status_code}")
+            hint = _provider_error_hint(response)
+            print(f"OpenRouter candidate unavailable: HTTP {response.status_code}{hint}")
             raise OpenRouterUnavailableError(
-                f"OpenRouter free router returned HTTP {response.status_code}"
+                f"OpenRouter free router returned HTTP {response.status_code}{hint}"
             )
         content = (response.json().get("choices", [{}])[0]
                    .get("message", {}).get("content") or "")
