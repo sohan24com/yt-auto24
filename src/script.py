@@ -78,29 +78,53 @@ Lessons from channel analytics (apply only when consistent with evidence):
 
 def fact_check(script):
     from .evidence import evidence_record, normalize_evidence
+    import json
 
-    prompt = f"""You are a strict documentary fact-checker. Use the available live web-search tool.
-For every material factual claim, provide a claim-to-source record: scene number (1-based), exact claim,
-a concise supporting explanation grounded in the search result, source name, direct HTTPS source URL,
-and confidence (high/medium/low). Never invent a URL, publication, quote, or evidence.
-Correct errors; remove or qualify claims that search does not support. Keep the same scenes and story.
-Return ONLY JSON with:
-{{"scenes":[...],"claims":[{{"scene":1,"claim":"","evidence":"","source":"","source_url":"https://...","confidence":"medium"}}],"changes":["..."]}}
-Include only claims actually checked using search; do not say that this is independent human verification.
+    # Exclude storyboard and visual-plan fields from the provider request. Those
+    # fields add thousands of irrelevant tokens and have caused free-provider
+    # token-rate (413) errors before search could run.
+    scenes = script.get("scenes", []) if isinstance(script, dict) else []
+    compact_scenes = [
+        {"scene": index, "title": str(scene.get("title", ""))[:160],
+         "narration": str(scene.get("narration", ""))[:1800]}
+        for index, scene in enumerate(scenes, 1) if isinstance(scene, dict)
+    ]
+    prompt = f"""Use the live web-search tool to check these documentary narration scenes.
+For each material factual claim you can support from a search result, return a concise record with its
+original scene number, exact claim, supporting evidence from the result, source name, direct HTTPS URL,
+and confidence (high/medium/low). Cover at least 8 distinct scenes spanning all acts only when sources
+support them. Omit unsupported claims; never invent facts, links, titles, quotes, or search results.
+If a source contradicts the narration, include a short correction in changes as an object with scene,
+replacement, and source_url. Do not rewrite or return the storyboard. Return ONLY JSON:
+{{"claims":[{{"scene":1,"claim":"","evidence":"","source":"","source_url":"https://...","confidence":"medium"}}],"changes":[]}}
+This is automated search assistance, not independent human verification.
 
-SCRIPT:
-{script}"""
+SCENES:
+{json.dumps(compact_scenes, ensure_ascii=False, separators=(',', ':'))}"""
     try:
-        out = gemini(prompt, grounding=True, temperature=0.2)
-        scenes = out.get("scenes")
+        out = gemini(prompt, grounding=True, temperature=0.2,
+                     max_output_tokens=4096, max_completion_tokens=1600)
         claims, reason = normalize_evidence(out, len(script.get("scenes", [])))
-        if (isinstance(scenes, list) and len(scenes) >= 8 and claims
-                and abs(len(scenes) - len(script.get("scenes", []))) <= 1):
-            result = dict(out)
+        if claims:
+            result = dict(script)
+            # Apply only replacements tied to a validated claim/source row.
+            for correction in out.get("changes", []):
+                if not isinstance(correction, dict):
+                    continue
+                try:
+                    scene_no = int(correction.get("scene", 0))
+                except (TypeError, ValueError):
+                    continue
+                replacement = " ".join(str(correction.get("replacement", "")).split())
+                source_url = str(correction.get("source_url", "")).strip()
+                if (replacement and 1 <= scene_no <= len(result.get("scenes", []))
+                        and any(row["scene"] == scene_no and row["source_url"] == source_url
+                                for row in claims)):
+                    result["scenes"][scene_no - 1]["narration"] = replacement
             result["sources"] = list(dict.fromkeys(row["source_url"] for row in claims))
             result["_fact_check"] = evidence_record(claims)
             return result
-        reason = reason or "fact-check response has an incomplete scene structure"
+        reason = reason or "fact-check response has insufficient search-linked claims"
         print("fact_check returned incomplete evidence; keeping original script")
     except Exception as e:
         reason = type(e).__name__
@@ -320,3 +344,4 @@ DESCRIPTION: {intro}
 Return JSON: {{"translations":{{"<code>":{{"title":"","description":""}}}}}}"""
     out = gemini(prompt, temperature=0.3).get("translations", {})
     return {k: v for k, v in out.items() if k in languages and v.get("title") and v.get("description")}
+
