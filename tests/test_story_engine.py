@@ -16,6 +16,16 @@ def sample_blueprint():
 
 
 class StoryBlueprintTests(unittest.TestCase):
+    def test_write_script_aligns_title_promise_to_opening_hook(self):
+        blueprint = sample_blueprint()
+        blueprint["scenes"][0]["narration"] = "No one expected this machine to survive."
+        blueprint["title_promise"] = "How chemical analysis exposed the Vinland Map fraud"
+        with patch("src.script.gemini", return_value=blueprint):
+            result = script.write_script({"topic": "Test topic", "angle": "Test angle"})
+        issues = story.validate_blueprint(result)
+        self.assertFalse(any("opening narration does not support" in issue for issue in issues))
+        self.assertEqual("No one expected this machine to survive.", result["title_promise"])
+
     def test_research_sample_has_valid_three_act_structure_and_linked_evidence(self):
         blueprint = sample_blueprint()
         issues = story.validate_blueprint(blueprint, require_evidence=True)
