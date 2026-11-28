@@ -406,7 +406,9 @@ def validate_blueprint(blueprint, require_evidence=False):
             target = float(scene.get("target_duration_seconds", 0))
             if number == 1 and not 0 < target <= 5:
                 issues.append("hook: planned first scene target must be no longer than five seconds")
-            if number > 1 and not 20 <= target <= 45:
+            if number == len(scenes) and not 8 <= target <= 20:
+                issues.append(f"retention: outro scene {number} target must be within 8-20 seconds")
+            elif 1 < number < len(scenes) and not 20 <= target <= 45:
                 issues.append(f"retention: scene {number} target must progress within 20-45 seconds")
         except (TypeError, ValueError):
             issues.append(f"retention: scene {number} has invalid target duration")
@@ -430,7 +432,7 @@ def validate_blueprint(blueprint, require_evidence=False):
 
 
 def validate_timing(blueprint, actual_durations, min_scene=20.0, max_scene=45.0,
-                    max_hook=5.0, max_total=None):
+                    max_hook=5.0, max_total=None, min_outro=8.0, max_outro=20.0):
     """Validate actual measured TTS scene audio, not word-count estimates."""
     scenes = blueprint.get("scenes", [])
     durations = [float(value) for value in actual_durations]
@@ -441,9 +443,11 @@ def validate_timing(blueprint, actual_durations, min_scene=20.0, max_scene=45.0,
         return ["timing: voice produced a zero-length scene"]
     if durations and durations[0] > max_hook:
         issues.append(f"hook: actual voiceover takes {durations[0]:.2f}s; maximum is {max_hook:.2f}s")
-    for index, value in enumerate(durations[1:], 2):
+    for index, value in enumerate(durations[1:-1], 2):
         if value < min_scene or value > max_scene:
             issues.append(f"retention: actual scene {index} progression interval is {value:.2f}s, outside {min_scene:.0f}-{max_scene:.0f}s")
+    if len(durations) > 1 and not min_outro <= durations[-1] <= max_outro:
+        issues.append(f"retention: actual outro scene {len(durations)} is {durations[-1]:.2f}s, outside {min_outro:.0f}-{max_outro:.0f}s")
     first_30 = 0.0
     loop_open_times = {}
     for index, (scene, duration) in enumerate(zip(scenes, durations), 1):
