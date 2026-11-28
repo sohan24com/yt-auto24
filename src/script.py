@@ -74,7 +74,7 @@ Lessons from channel analytics (apply only when consistent with evidence):
         if result.get("scenes"):
             import re
             opening = str(result["scenes"][0].get("narration", "")).strip()
-            sentences = re.split(r"(?<=[.!?])\\s+", opening, maxsplit=1)
+            sentences = re.split(r"(?<=[.!?])\s+", opening, maxsplit=1)
             first_sentence = sentences[0].strip() if sentences else opening
             from .story import _tokens
             promise = str(result.get("title_promise", "")).strip()
