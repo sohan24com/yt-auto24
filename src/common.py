@@ -228,10 +228,10 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
                     # Request/model issues are not repaired by rotating credentials.
                     break
                 if status in (403, 429):
-                    # Do not rotate keys to evade project permissions or quota limits.
-                    # Stop Gemini for this process and let the configured provider fallback run.
-                    _GEMINI_PAUSED_REASON = f"HTTP {status} ({kind})"
-                    break
+                    # Try the other explicitly configured Gemini credentials.
+                    # These may belong to separate Google projects; stay Gemini-only.
+                    continue
+
                 if status == 401:
                     # A distinct configured key can fix an invalid credential.
                     continue
@@ -527,47 +527,13 @@ def _openrouter(prompt, system=None, json_out=True, temperature=0.9,
 def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
            tries=None, request_timeout=90, total_timeout=300,
            max_output_tokens=32000, max_completion_tokens=4096):
-    """Use Gemini, then Groq, Cloudflare and OpenRouter free models for ungrounded text."""
-    try:
-        return _gemini(
-            prompt, system=system, grounding=grounding, json_out=json_out,
-            temperature=temperature, tries=tries,
-            request_timeout=request_timeout, total_timeout=total_timeout,
-            max_output_tokens=max_output_tokens,
-        )
-    except GeminiUnavailableError as gemini_error:
-        if grounding:
-            # Groq browser_search supplies a real search step; do not substitute a
-            # plain text model and falsely label that result as grounded.
-            try:
-                print("Gemini Search unavailable; trying Groq browser-search fallback")
-                return _groq(
-                    prompt, system=system, json_out=json_out, temperature=temperature,
-                    grounding=True, max_completion_tokens=max_completion_tokens,
-                )
-            except GroqUnavailableError as groq_error:
-                if str(groq_error) == "No Groq API keys are configured":
-                    raise gemini_error
-                raise GeminiUnavailableError(
-                    f"{gemini_error}; Groq browser-search fallback failed: {groq_error}"
-                ) from groq_error
-        errors = []
-        providers = (
-            ("Groq", _groq, GroqUnavailableError),
-            ("Cloudflare Workers AI", _cloudflare, CloudflareUnavailableError),
-            ("OpenRouter free models", _openrouter, OpenRouterUnavailableError),
-        )
-        for label, call, error_type in providers:
-            try:
-                print(f"Trying {label} fallback")
-                return call(prompt, system=system, json_out=json_out, temperature=temperature)
-            except error_type as exc:
-                errors.append(f"{label}: {exc}")
-        if all("credentials are not configured" in error for error in errors):
-            raise gemini_error
-        raise GeminiUnavailableError(
-            f"{gemini_error}; " + "; ".join(errors)
-        )
+    """Use only configured Gemini API keys and Gemini models for text generation."""
+    return _gemini(
+        prompt, system=system, grounding=grounding, json_out=json_out,
+        temperature=temperature, tries=tries,
+        request_timeout=request_timeout, total_timeout=total_timeout,
+        max_output_tokens=max_output_tokens,
+    )
 
 
 # ---------- notifications ----------
