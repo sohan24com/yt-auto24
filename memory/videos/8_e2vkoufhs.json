@@ -87,6 +87,9 @@
  ],
  "short_scene": "Century of Shadows",
  "latest": {
-  "public_views": 77
+  "views": 13,
+  "averageViewPercentage": 4.55,
+  "averageViewDuration": 26,
+  "public_views": 97
  }
 }

@@ -71,6 +71,12 @@
  "snapshots": {
   "24h": {
    "public_views": 23
+  },
+  "72h": {
+   "views": 24,
+   "averageViewPercentage": 14.95,
+   "averageViewDuration": 96,
+   "public_views": 25
   }
  },
  "localized": [
@@ -87,9 +93,9 @@
  ],
  "short_scene": "The Unbroken Code",
  "latest": {
-  "views": 1,
-  "averageViewPercentage": 6.98,
-  "averageViewDuration": 45,
-  "public_views": 24
+  "views": 24,
+  "averageViewPercentage": 14.95,
+  "averageViewDuration": 96,
+  "public_views": 25
  }
 }

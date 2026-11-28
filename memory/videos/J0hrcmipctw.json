@@ -67,6 +67,12 @@
  "snapshots": {
   "24h": {
    "public_views": 2
+  },
+  "72h": {
+   "views": 2,
+   "averageViewPercentage": 24.73,
+   "averageViewDuration": 140,
+   "public_views": 2
   }
  },
  "localized": [
