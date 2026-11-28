@@ -145,6 +145,30 @@ class StoryBlueprintTests(unittest.TestCase):
                    "thumb_texts": ["LOST AT SEA", "ANCIENT SHIP"]}
         self.assertTrue(story.validate_packaging(blueprint, invalid))
 
+    def test_fact_check_searches_an_uncovered_act_before_returning_evidence(self):
+        blueprint = sample_blueprint()
+        first = {"claims": [
+            {"scene": scene, "claim": f"Supported documentary claim for scene {scene}.",
+             "evidence": "A reliable source directly supports this specific historical claim.",
+             "source": "Research source", "source_url": f"https://example.org/source/{scene}",
+             "confidence": "high"}
+            for scene in [1, 3, 6, 8, 10, 12, 13, 14]
+        ], "changes": []}
+        second = {"claims": [
+            {"scene": 15, "claim": "The final investigation documented a measurable result.",
+             "evidence": "A reliable source directly supports this final-act historical claim.",
+             "source": "Final-act research source", "source_url": "https://example.org/source/15",
+             "confidence": "high"}
+        ], "changes": []}
+        with patch("src.script.gemini", side_effect=[first, second]) as call:
+            checked = script.fact_check(blueprint)
+        self.assertEqual(2, call.call_count)
+        self.assertIn("MISSING ACTS: [3]", call.call_args.args[0])
+        attached = story.attach_evidence(checked, checked["_fact_check"])
+        self.assertTrue(attached["scenes"][14]["evidence_ids"])
+        self.assertFalse(any("Act III has no linked evidence"
+                             in issue for issue in story.validate_blueprint(attached, require_evidence=True)))
+
     def test_phase_two_evidence_rows_are_mapped_to_scene_ids(self):
         blueprint = sample_blueprint()
         rows = []
