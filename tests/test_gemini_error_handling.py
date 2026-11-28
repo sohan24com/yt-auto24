@@ -30,7 +30,7 @@ class GeminiTextErrorTests(unittest.TestCase):
             with self.assertRaises(common.GeminiUnavailableError) as error:
                 common._gemini("prompt", json_out=False)
 
-        self.assertEqual(1, post.call_count)
+        self.assertEqual(4, post.call_count)
         self.assertIn("quota or rate limit", str(error.exception))
 
     def test_permission_error_stops_key_rotation(self):
@@ -60,13 +60,17 @@ class GeminiTextErrorTests(unittest.TestCase):
             self.assertIn("available-model", post.call_args_list[1].args[0])
             self.assertEqual("test-key-one", post.call_args_list[1].kwargs["params"]["key"])
 
-    def test_quota_failure_routes_to_configured_provider_fallback(self):
+    def test_quota_failure_does_not_call_non_gemini_provider(self):
         with patch.object(common, "_gemini", side_effect=common.GeminiUnavailableError("quota")), \
-             patch.object(common, "_groq", return_value="free fallback") as groq:
-            result = common.gemini("prompt", json_out=False)
+             patch.object(common, "_groq") as groq, \
+             patch.object(common, "_cloudflare") as cloudflare, \
+             patch.object(common, "_openrouter") as openrouter:
+            with self.assertRaises(common.GeminiUnavailableError):
+                common.gemini("prompt", json_out=False)
 
-        self.assertEqual("free fallback", result)
-        groq.assert_called_once()
+        groq.assert_not_called()
+        cloudflare.assert_not_called()
+        openrouter.assert_not_called()
 
 
 class GeminiTtsErrorTests(unittest.TestCase):
