@@ -227,6 +227,8 @@ def build_once(wd, validation_feedback=None):
         max_scene=float(timing.get("max_progression_seconds", 45)),
         max_hook=float(timing.get("hook_max_seconds", 5)),
         max_total=float(limits["max_seconds"]),
+        min_outro=float(timing.get("min_outro_seconds", 8)),
+        max_outro=float(timing.get("max_outro_seconds", 20)),
     )
     if timing_issues:
         print("QUALITY GATE failed before footage:", timing_issues)
