@@ -69,6 +69,20 @@ Lessons from channel analytics (apply only when consistent with evidence):
         result = normalize_act_labels(result)
         result = align_visual_anchors(result)
         result = reconcile_loop_references(result)
+        # Keep packaging promise anchored to the actual spoken cold open.
+        # Repair mismatched metadata rather than discarding an otherwise valid script.
+        if result.get("scenes"):
+            import re
+            opening = str(result["scenes"][0].get("narration", "")).strip()
+            sentences = re.split(r"(?<=[.!?])\\s+", opening, maxsplit=1)
+            first_sentence = sentences[0].strip() if sentences else opening
+            from .story import _tokens
+            promise = str(result.get("title_promise", "")).strip()
+            promise_terms = _tokens(promise)
+            if promise_terms and len(promise_terms & _tokens(first_sentence)) < min(2, len(promise_terms)):
+                if len(first_sentence) >= 12:
+                    result["title_promise"] = first_sentence
+                    print("Aligned title promise to the documented opening hook.")
         if not 3 <= len(str(result.get("hook_text", "")).split()) <= 5 and result.get("scenes"):
             result["hook_text"] = _hook_text(result["scenes"][0].get("narration", ""))
         result["story_schema_version"] = 1
