@@ -129,6 +129,20 @@ def _fact_check_and_attach(script):
         checked[key] = script.get(key, checked.get(key))
     return STORY.attach_evidence(checked, checked.get("_fact_check", {}))
 
+
+def _same_scene_narration(left, right):
+    """Return whether two drafts have identical scene narration suitable for voice reuse."""
+    if not isinstance(left, dict) or not isinstance(right, dict):
+        return False
+    left_scenes, right_scenes = left.get("scenes"), right.get("scenes")
+    if not isinstance(left_scenes, list) or not isinstance(right_scenes, list):
+        return False
+    return (len(left_scenes) == len(right_scenes)
+            and all(isinstance(a, dict) and isinstance(b, dict)
+                    and str(a.get("narration", "")).strip() == str(b.get("narration", "")).strip()
+                    for a, b in zip(left_scenes, right_scenes)))
+
+
 def build_once(wd, validation_feedback=None):
     wd = Path(wd)
     state = _load_state(wd)
@@ -143,12 +157,12 @@ def build_once(wd, validation_feedback=None):
     script = state.get("script")
     if not isinstance(script, dict):
         script = state.get("script_draft")
+    previous_script = script if isinstance(script, dict) else None
     if not isinstance(script, dict) or S.valid(script) or validation_feedback:
         if validation_feedback:
             state.pop("geometry", None)
             state.pop("assets", None)
-            state.pop("voice", None)
-            for artifact in ("voice.wav", "final.mp4", "audio_report.json", "subs.ass"):
+            for artifact in ("final.mp4", "audio_report.json", "subs.ass"):
                 (wd / artifact).unlink(missing_ok=True)
         previous_draft = state.get("script_draft")
         if not isinstance(previous_draft, dict):
@@ -183,6 +197,9 @@ def build_once(wd, validation_feedback=None):
         else:
             raise RuntimeError(f"could not produce a valid script: {problems}")
         script = _fact_check_and_attach(script)
+        if validation_feedback and not _same_scene_narration(previous_script, script):
+            state.pop("voice", None)
+            (wd / "voice.wav").unlink(missing_ok=True)
         fact_checked_this_run = True
         state.pop("script_draft", None)
         state.pop("script_feedback", None)
@@ -227,7 +244,7 @@ def build_once(wd, validation_feedback=None):
         max_scene=float(timing.get("max_progression_seconds", 45)),
         max_hook=float(timing.get("hook_max_seconds", 5)),
         max_total=float(limits["max_seconds"]),
-        min_outro=float(timing.get("min_outro_seconds", 8)),
+        min_outro=float(timing.get("min_outro_seconds", 5)),
         max_outro=float(timing.get("max_outro_seconds", 20)),
     )
     if timing_issues:
