@@ -148,7 +148,7 @@ class GeminiUnavailableError(RuntimeError):
 
 
 def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
-           tries=None, request_timeout=90, total_timeout=300):
+           tries=None, request_timeout=90, total_timeout=300, max_output_tokens=32000):
     global _GEMINI_PAUSED_REASON
     if _GEMINI_PAUSED_REASON:
         raise GeminiUnavailableError(
@@ -156,7 +156,7 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
         )
     body = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": 32000},
+        "generationConfig": {"maxOutputTokens": max(128, min(32000, int(max_output_tokens)))},
     }
     if system:
         body["systemInstruction"] = {"parts": [{"text": system}]}
@@ -278,7 +278,7 @@ class GroqUnavailableError(RuntimeError):
 
 
 def _groq(prompt, system=None, json_out=True, temperature=0.9, grounding=False,
-          request_timeout=20, total_timeout=90):
+          request_timeout=20, total_timeout=90, max_completion_tokens=4096):
     keys = list(dict.fromkeys(k.strip() for k in (
         env("GROQ_API_KEY", False), env("GROQ_API_KEY_2", False),
     ) if k and k.strip()))
@@ -306,7 +306,7 @@ def _groq(prompt, system=None, json_out=True, temperature=0.9, grounding=False,
                 "model": model,
                 "messages": messages,
                 "temperature": temperature,
-                "max_completion_tokens": 4096,
+                "max_completion_tokens": max(128, min(4096, int(max_completion_tokens))),
             }
             if grounding:
                 payload["tools"] = [{"type": "browser_search"}]
@@ -466,13 +466,15 @@ def _openrouter(prompt, system=None, json_out=True, temperature=0.9,
         ) from exc
 
 def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
-           tries=None, request_timeout=90, total_timeout=300):
+           tries=None, request_timeout=90, total_timeout=300,
+           max_output_tokens=32000, max_completion_tokens=4096):
     """Use Gemini, then Groq, Cloudflare and OpenRouter free models for ungrounded text."""
     try:
         return _gemini(
             prompt, system=system, grounding=grounding, json_out=json_out,
             temperature=temperature, tries=tries,
             request_timeout=request_timeout, total_timeout=total_timeout,
+            max_output_tokens=max_output_tokens,
         )
     except GeminiUnavailableError as gemini_error:
         if grounding:
@@ -482,7 +484,7 @@ def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
                 print("Gemini Search unavailable; trying Groq browser-search fallback")
                 return _groq(
                     prompt, system=system, json_out=json_out, temperature=temperature,
-                    grounding=True,
+                    grounding=True, max_completion_tokens=max_completion_tokens,
                 )
             except GroqUnavailableError as groq_error:
                 if str(groq_error) == "No Groq API keys are configured":
@@ -533,4 +535,5 @@ def notify(msg):
                           data={"chat_id": chat, "text": msg[:3500]}, timeout=20)
         except Exception:
             pass
+
 

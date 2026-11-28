@@ -55,6 +55,25 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual("search_linked", checked["_fact_check"]["status"])
         self.assertEqual(8, len(checked["_fact_check"]["claims"]))
 
+    def test_fact_check_sends_compact_narration_and_bounds_grounded_output(self):
+        scenes = [{"title": f"Scene {i}", "narration": f"Documented narration {i}",
+                   "visual_plan": {"description": "x" * 20000}} for i in range(1, 9)]
+        claims = [
+            {"scene": i, "claim": f"Documented event detail number {i}",
+             "evidence": f"A source explains the documented event detail for scene {i}.",
+             "source": "Public archive", "source_url": f"https://example.org/source/{i}",
+             "confidence": "medium"}
+            for i in range(1, 9)
+        ]
+        with patch.object(script, "gemini", return_value={"claims": claims, "changes": []}) as provider:
+            checked = script.fact_check({"scenes": scenes, "sources": []})
+        prompt = provider.call_args.args[0]
+        self.assertNotIn("visual_plan", prompt)
+        self.assertIn('"narration":"Documented narration 1"', prompt)
+        self.assertEqual(4096, provider.call_args.kwargs["max_output_tokens"])
+        self.assertEqual(1600, provider.call_args.kwargs["max_completion_tokens"])
+        self.assertEqual("search_linked", checked["_fact_check"]["status"])
+
 
 class QualityTests(unittest.TestCase):
     def test_ass_subtitles_reject_out_of_range_timestamps(self):
@@ -130,3 +149,4 @@ class FfmpegIntegrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

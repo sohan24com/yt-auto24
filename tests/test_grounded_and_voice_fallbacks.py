@@ -25,12 +25,13 @@ class GroundedFallbackTests(unittest.TestCase):
         env_values = {"GROQ_API_KEY": "test-key", "GROQ_API_KEY_2": ""}
         with patch.object(common, "env", side_effect=lambda name, required=True: env_values.get(name, "")), \
              patch.object(common.requests, "post", return_value=response) as post:
-            result = common._groq("Return JSON", grounding=True)
+            result = common._groq("Return JSON", grounding=True, max_completion_tokens=1600)
         self.assertEqual(result["sources"], ["https://example.org"])
         payload = post.call_args.kwargs["json"]
         self.assertEqual(payload["model"], "openai/gpt-oss-20b")
         self.assertEqual(payload["tools"], [{"type": "browser_search"}])
         self.assertEqual(payload["tool_choice"], "required")
+        self.assertEqual(payload["max_completion_tokens"], 1600)
         self.assertNotIn("response_format", payload)
 
 
@@ -56,3 +57,4 @@ class OfflineVoiceFallbackTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
