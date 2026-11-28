@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 
 from PIL import Image
 
-from src import evidence, pipeline, quality, script, youtube
+from src import evidence, pipeline, quality, script, story, youtube
 
 
 class EvidenceTests(unittest.TestCase):
@@ -76,6 +76,17 @@ class EvidenceTests(unittest.TestCase):
 
 
 class QualityTests(unittest.TestCase):
+    def test_voice_retry_can_reuse_audio_when_scene_narration_is_unchanged(self):
+        previous = {"scenes": [{"narration": "Same words."}, {"narration": "Same outro."}]}
+        revised = {"scenes": [{"narration": "Same words."}, {"narration": "Same outro."}]}
+        changed = {"scenes": [{"narration": "Revised words."}, {"narration": "Same outro."}]}
+        self.assertTrue(pipeline._same_scene_narration(previous, revised))
+        self.assertFalse(pipeline._same_scene_narration(previous, changed))
+
+    def test_fact_check_fallback_outro_timing_accepts_twelve_seconds(self):
+        blueprint = {"scenes": [{"opens_loop": ["L1"]}, {"opens_loop": []}]}
+        self.assertEqual([], story.validate_timing(blueprint, [4.0, 12.09], min_outro=5))
+
     def test_ass_subtitles_reject_out_of_range_timestamps(self):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "subs.ass"
