@@ -571,7 +571,12 @@ def _groq(prompt, system=None, json_out=True, temperature=0.9, grounding=False,
                                         parts.append(part.get("text", ""))
                         content = "\\n".join(parts)
                     if content.strip():
-                        return extract_json(content) if json_out else content
+                        try:
+                            return extract_json(content) if json_out else content
+                        except Exception as exc:
+                            last = f"{model}: response parse failed ({type(exc).__name__})"
+                            print(f"Groq response parse failed: {model} ({type(exc).__name__})")
+                            continue
                     last = f"{model}: empty response"
                 except requests.Timeout:
                     last = f"{model}: request timed out"
@@ -622,7 +627,12 @@ def _groq(prompt, system=None, json_out=True, temperature=0.9, grounding=False,
                     if not content.strip():
                         last = f"{model}: empty response"
                         continue
-                    return extract_json(content) if json_out else content
+                    try:
+                        return extract_json(content) if json_out else content
+                    except Exception as exc:
+                        last = f"{model}: response parse failed ({type(exc).__name__})"
+                        print(f"Groq response parse failed: {model} ({type(exc).__name__})")
+                        continue
 
                 status = int(response.status_code)
                 status_counts[status] = status_counts.get(status, 0) + 1
@@ -782,6 +792,7 @@ def gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
                 max_completion_tokens=max_completion_tokens,
             )
         except GroqUnavailableError as groq_error:
+            print(f"Groq fallback failed: {groq_error}")
             if grounding:
                 raise GeminiUnavailableError(
                     "Grounded generation requires Gemini or Groq search; both are unavailable."
