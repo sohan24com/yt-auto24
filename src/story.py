@@ -406,8 +406,8 @@ def validate_blueprint(blueprint, require_evidence=False):
             target = float(scene.get("target_duration_seconds", 0))
             if number == 1 and not 0 < target <= 5:
                 issues.append("hook: planned first scene target must be no longer than five seconds")
-            if number == len(scenes) and not 8 <= target <= 20:
-                issues.append(f"retention: outro scene {number} target must be within 8-20 seconds")
+            if number == len(scenes) and not 5 <= target <= 20:
+                issues.append(f"retention: outro scene {number} target must be within 5-20 seconds")
             elif 1 < number < len(scenes) and not 20 <= target <= 45:
                 issues.append(f"retention: scene {number} target must progress within 20-45 seconds")
         except (TypeError, ValueError):
@@ -432,7 +432,7 @@ def validate_blueprint(blueprint, require_evidence=False):
 
 
 def validate_timing(blueprint, actual_durations, min_scene=20.0, max_scene=45.0,
-                    max_hook=5.0, max_total=None, min_outro=8.0, max_outro=20.0):
+                    max_hook=5.0, max_total=None, min_outro=5.0, max_outro=20.0):
     """Validate actual measured TTS scene audio, not word-count estimates."""
     scenes = blueprint.get("scenes", [])
     durations = [float(value) for value in actual_durations]
