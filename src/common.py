@@ -152,7 +152,7 @@ class GeminiUnavailableError(RuntimeError):
 
 
 # Gemini is available at the start of each run; failures may pause it later.
-_GEMINI_PAUSED_REASON = None
+_GEMINI_PAUSED_REASON = ""
 
 
 def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
@@ -264,6 +264,8 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
     summary = ", ".join(f"HTTP {code} x{count}" for code, count in sorted(status_counts.items()))
     if not summary:
         summary = f"{attempts} request attempt(s)"
+    if status_counts.get(429):
+        _GEMINI_PAUSED_REASON = "quota or rate limit"
     raise GeminiUnavailableError(
         f"Gemini unavailable after {attempts} bounded attempt(s) ({summary}); last response: {last}"
     )
