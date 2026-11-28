@@ -474,6 +474,7 @@ def main():
         else:
             raise RuntimeError(f"quality gate failed 3x: {problems}")
 
+        plans = _load_state(wd)["geometry"]["plans"]
         meta = S.make_metadata(topic, [(stamp(st), s) for st, s in zip(starts, scenes)],
                                script.get("sources", []), F.credit_line(),
                                fact_check=script.get("_fact_check"), story_blueprint=script)
