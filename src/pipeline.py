@@ -1,6 +1,6 @@
 """One run = one finished documentary: topic -> script -> fact-check -> voice -> footage -> edit
 -> quality gate -> thumbnails -> Drive -> YouTube -> Short -> memory."""
-import datetime as dt, hashlib, json, os, shutil, subprocess, tempfile, traceback
+import datetime as dt, hashlib, json, os, re, shutil, subprocess, tempfile, traceback
 from pathlib import Path
 from . import topic as T, script as S, voice as V, footage as F, edit as E
 from . import thumbnail as TH, shorts as SH, drive as D, youtube as Y
@@ -156,6 +156,35 @@ def _script_repair_feedback(problems):
             "with id='L1', a specific question, opened_scene=1, and payoff_scene between 2 and 17; "
             "the payoff scene must include 'L1' in pays_off."
         )
+    for issue in tuple(feedback):
+        timing_issue = re.search(
+            r"retention: actual scene (\d+) progression interval is ([\d.]+)s, outside ([\d.]+)-([\d.]+)s",
+            str(issue),
+        )
+        if timing_issue:
+            scene, actual, minimum, maximum = timing_issue.groups()
+            if float(actual) < float(minimum):
+                feedback.append(
+                    f"Timing repair: expand scene {scene}'s narration with substantive, evidence-supported "
+                    f"context or causal detail until its measured voice duration reaches at least {minimum} "
+                    f"seconds (target range {minimum}-{maximum} seconds); do not add filler."
+                )
+            else:
+                feedback.append(
+                    f"Timing repair: trim scene {scene}'s narration while preserving evidence and causality "
+                    f"until its measured voice duration is at most {maximum} seconds."
+                )
+        if issue in ("missing documentary outro/payoff",
+                     "ending: final scene needs a satisfying resolution and natural outro"):
+            feedback.append(
+                "Outro repair: scene 18 narration must contain 20-30 words and end with a concise, natural "
+                "viewer invitation; scene 17 must deliver the evidence-bounded resolution."
+            )
+        if issue == "ending: no story loop is resolved before the outro":
+            feedback.append(
+                "Payoff repair: choose an open_loops ID and include it in pays_off in its registered payoff "
+                "scene 2-17; keep payoff_scene aligned with that scene number."
+            )
     return feedback
 
 
@@ -183,13 +212,14 @@ def build_once(wd, validation_feedback=None):
         previous_draft = state.get("script_draft")
         if not isinstance(previous_draft, dict):
             previous_draft = script if isinstance(script, dict) else None
-        problems = list(state.get("script_feedback") or validation_feedback or [])
+        repair_guidance = list(state.get("script_feedback") or validation_feedback or [])
         max_attempts = 4
         for attempt in range(1, max_attempts + 1):
-            script = S.write_script(topic, validation_feedback=problems,
+            script = S.write_script(topic, validation_feedback=repair_guidance,
                                     previous_draft=previous_draft)
-            problems = _script_repair_feedback(S.valid(script))
-            if not problems:
+            validation_issues = list(S.valid(script))
+            problems = _script_repair_feedback(validation_issues)
+            if not validation_issues:
                 if isinstance(script, dict):
                     state["script_draft"] = script
                     state["script_feedback"] = []
@@ -198,7 +228,7 @@ def build_once(wd, validation_feedback=None):
             print(f"script rejected (draft {attempt}/{max_attempts}):", problems)
             previous_draft = script if isinstance(script, dict) else None
             limits = cfg()["video"]
-            word_count_issue = next((str(issue) for issue in problems
+            word_count_issue = next((str(issue) for issue in validation_issues
                                      if str(issue).startswith("word count ")), None)
             if word_count_issue:
                 try:
@@ -206,9 +236,10 @@ def build_once(wd, validation_feedback=None):
                 except (IndexError, ValueError):
                     reported_count = None
                 problems.append(_narration_budget_feedback(script, limits, reported_count))
+            repair_guidance = list(dict.fromkeys(repair_guidance + problems))
             if isinstance(script, dict):
                 state["script_draft"] = script
-                state["script_feedback"] = list(problems)
+                state["script_feedback"] = list(repair_guidance)
                 _save_state(wd, state)
         else:
             raise RuntimeError(f"could not produce a valid script: {problems}")
