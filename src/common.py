@@ -105,6 +105,26 @@ def _provider_error_hint(response):
     return f" ({', '.join(parts)})" if parts else ""
 
 
+def _provider_error_message(response, secrets=()):
+    """Return a short, sanitized provider message without exposing credentials."""
+    try:
+        payload = response.json()
+    except Exception:
+        return "provider error message unavailable"
+    error = payload.get("error") if isinstance(payload, dict) else None
+    if not isinstance(error, dict):
+        errors = payload.get("errors") if isinstance(payload, dict) else None
+        error = errors[0] if isinstance(errors, list) and errors and isinstance(errors[0], dict) else {}
+    message = error.get("message") if isinstance(error, dict) else None
+    if not isinstance(message, str) or not message.strip():
+        return "provider error message unavailable"
+    message = redact_secrets(message)
+    for secret in sorted({str(value).strip() for value in secrets if value}, key=len, reverse=True):
+        message = message.replace(secret, "[REDACTED]")
+    message = re.sub(r"\s+", " ", message).strip()
+    return message[:500] or "provider error message unavailable"
+
+
 # Keep this allowlist limited to models whose standard text API has a documented free tier.
 # Model discovery only decides which supported allowlisted IDs to try; it never enables paid IDs.
 GEMINI_FALLBACK_MODELS = (
@@ -155,11 +175,12 @@ class GeminiUnavailableError(RuntimeError):
 
 # Gemini is available at the start of each run; failures may pause it later.
 _GEMINI_PAUSED_REASON = ""
+_GEMINI_KEY_COUNT_LOGGED = False
 
 
 def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9,
            tries=None, request_timeout=90, total_timeout=300, max_output_tokens=32000):
-    global _GEMINI_PAUSED_REASON
+    global _GEMINI_PAUSED_REASON, _GEMINI_KEY_COUNT_LOGGED
     if _GEMINI_PAUSED_REASON:
         raise GeminiUnavailableError(
             f"Gemini paused for this run after {_GEMINI_PAUSED_REASON}"
@@ -175,15 +196,21 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
     elif json_out:
         body["generationConfig"]["responseMimeType"] = "application/json"
 
-    keys = list(dict.fromkeys(k.strip() for k in (
-        env("GEMINI_API_KEY", False), env("GEMINI_API_KEY_2", False),
-        env("GEMINI_API_KEY_3", False), env("GEMINI_API_KEY_4", False),
-        env("GEMINI_API_KEY_5", False),
-    ) if k and k.strip()))
+    key_names = ("GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3",
+                 "GEMINI_API_KEY_4", "GEMINI_API_KEY_5")
+    keys, seen = [], set()
+    for key_index, name in enumerate(key_names, start=1):
+        key = env(name, False).strip()
+        if key and key not in seen:
+            keys.append((key_index, key))
+            seen.add(key)
+    if not _GEMINI_KEY_COUNT_LOGGED:
+        print(f"Gemini API keys found: {len(keys)} of {len(key_names)}")
+        _GEMINI_KEY_COUNT_LOGGED = True
     if not keys:
         raise GeminiUnavailableError("No Gemini API keys are configured")
 
-    models = _model_list(keys[0])
+    models = _model_list(keys[0][1])
     if not models:
         raise GeminiUnavailableError("No Gemini models are available to try")
 
@@ -191,10 +218,11 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
     attempts = 0
     last = "no usable response"
     status_counts = {}
+    permission_denied = False
 
     for model in models:
         overloaded = False
-        for key in keys:
+        for key_index, key in keys:
             if tries is not None and attempts >= tries:
                 break
             remaining = deadline - time.monotonic()
@@ -227,7 +255,12 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
                 }
                 kind = kinds.get(status, "temporary service failure" if status >= 500 else "HTTP error")
                 last = f"{model}: HTTP {status} ({kind})"
-                print(f"Gemini candidate unavailable: HTTP {status} ({kind})")
+                if status == 429:
+                    message = _provider_error_message(r, (secret for _, secret in keys))
+                    print(f"Gemini rate limited: key {key_index}/5, model {model}, "
+                          f"HTTP 429, provider error: {message}")
+                else:
+                    print(f"Gemini candidate unavailable: HTTP {status} ({kind})")
 
                 if status == 503 or status in (500, 502, 504):
                     # Capacity errors are model-wide; move to another model instead of
@@ -237,7 +270,11 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
                 if status in (400, 404):
                     # Request/model issues are not repaired by rotating credentials.
                     break
-                if status in (403, 429):
+                if status == 403:
+                    # Permission/free-tier failures are configuration errors, not rate limits.
+                    permission_denied = True
+                    break
+                if status == 429:
                     # Try the other explicitly configured Gemini credentials.
                     # These may belong to separate Google projects; stay Gemini-only.
                     continue
@@ -254,6 +291,8 @@ def _gemini(prompt, system=None, grounding=False, json_out=True, temperature=0.9
                 last = f"{model}: {type(ex).__name__}"
                 continue
 
+        if permission_denied:
+            break
         if tries is not None and attempts >= tries:
             break
         if _GEMINI_PAUSED_REASON:
