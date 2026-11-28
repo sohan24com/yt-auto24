@@ -113,6 +113,8 @@ GEMINI_FALLBACK_MODELS = (
     "gemini-2.0-flash",
 )
 
+_MODELS = []
+
 
 def _model_list(key):
     """Discover supported Gemini Flash text models and prefer configured candidates."""
