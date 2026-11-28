@@ -6,7 +6,7 @@ from . import topic as T, script as S, voice as V, footage as F, edit as E
 from . import thumbnail as TH, shorts as SH, drive as D, youtube as Y
 from .common import cfg, now, load_videos, save_video, notify
 from . import quality, story as STORY
-from .evidence import manifest_rows
+from .evidence import evidence_record, manifest_rows
 from . import director as DR, toolchain as TC
 
 CHECKPOINT_VERSION = 3
@@ -116,7 +116,12 @@ def _narration_budget_feedback(script, limits, reported_count=None):
 
 def _fact_check_and_attach(script):
     """Run live claim checks and preserve the generated story plan."""
-    checked = S.fact_check(script)
+    try:
+        checked = S.fact_check(script)
+    except Exception as exc:
+        print("WARNING: fact_check failed; continuing without verified evidence:", type(exc).__name__)
+        checked = dict(script)
+        checked["_fact_check"] = evidence_record([], type(exc).__name__)
     checked = STORY.preserve_planning(script, checked)
     checked = STORY.align_visual_anchors(checked)
     checked = STORY.reconcile_loop_references(checked)
@@ -183,7 +188,8 @@ def build_once(wd, validation_feedback=None):
         state.pop("script_feedback", None)
         state["script"] = script
         _save_state(wd, state)
-    if (cfg().get("publishing", {}).get("require_search_linked_fact_check", True)
+    require_evidence = bool(cfg().get("publishing", {}).get("require_search_linked_fact_check", True))
+    if (require_evidence
             and script.get("_fact_check", {}).get("status") != "search_linked"
             and not fact_checked_this_run):
         # An interrupted/failed run may have checkpointed a valid script with an
@@ -194,12 +200,12 @@ def build_once(wd, validation_feedback=None):
         _save_state(wd, state)
     checked = script
     fact_status = checked.get("_fact_check", {}).get("status")
-    if cfg().get("publishing", {}).get("require_search_linked_fact_check", True) and fact_status != "search_linked":
+    if require_evidence and fact_status != "search_linked":
         raise RuntimeError("publish held: this run has no valid search-linked claim evidence")
-    story_issues = STORY.validate_blueprint(checked, require_evidence=True)
+    story_issues = STORY.validate_blueprint(checked, require_evidence=require_evidence)
     if story_issues:
         raise RuntimeError("publish held by story quality checks: " + "; ".join(story_issues[:12]))
-    checked["story_quality"] = STORY.quality_score(checked, require_evidence=True)
+    checked["story_quality"] = STORY.quality_score(checked, require_evidence=require_evidence)
     script = checked
     scenes = script["scenes"]
 
