@@ -109,8 +109,17 @@ SCENES:
                 int(scene.get("number", index) or index): int(scene.get("act", 0) or 0)
                 for index, scene in enumerate(scenes, 1) if isinstance(scene, dict)
             }
+            # Older/compact callers may provide scenes without act metadata.
+            # Only run the three-act supplement when the storyboard explicitly
+            # contains a complete three-act structure.
+            declared_acts = {scene_acts.get(row["scene"], 0) for row in claims}
+            storyboard_acts = {
+                int(scene.get("act", 0) or 0)
+                for scene in scenes if isinstance(scene, dict)
+            }
+            has_three_act_structure = {1, 2, 3}.issubset(storyboard_acts)
             covered = {scene_acts.get(row["scene"], 0) for row in claims}
-            missing_acts = sorted({1, 2, 3} - covered)
+            missing_acts = sorted({1, 2, 3} - covered) if has_three_act_structure else []
             outputs = [out]
             if missing_acts:
                 targeted = [row for row in compact_scenes if row["act"] in missing_acts]
