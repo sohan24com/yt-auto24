@@ -143,6 +143,22 @@ def _same_scene_narration(left, right):
                     for a, b in zip(left_scenes, right_scenes)))
 
 
+def _script_repair_feedback(problems):
+    """Add precise repair directions for common structured-story failures."""
+    feedback = list(problems or [])
+    hook_issues = (
+        "retention: opening hook must create a specific question",
+        "retention: scene 1 field 'opens_loop' must be a non-empty list of registered loop IDs",
+    )
+    if any(issue in feedback for issue in hook_issues):
+        feedback.append(
+            "Hook-loop repair: set scenes[0]['opens_loop'] to ['L1']; add an open_loops entry "
+            "with id='L1', a specific question, opened_scene=1, and payoff_scene between 2 and 17; "
+            "the payoff scene must include 'L1' in pays_off."
+        )
+    return feedback
+
+
 def build_once(wd, validation_feedback=None):
     wd = Path(wd)
     state = _load_state(wd)
@@ -168,11 +184,11 @@ def build_once(wd, validation_feedback=None):
         if not isinstance(previous_draft, dict):
             previous_draft = script if isinstance(script, dict) else None
         problems = list(state.get("script_feedback") or validation_feedback or [])
-        max_attempts = 3
+        max_attempts = 4
         for attempt in range(1, max_attempts + 1):
             script = S.write_script(topic, validation_feedback=problems,
                                     previous_draft=previous_draft)
-            problems = list(S.valid(script))
+            problems = _script_repair_feedback(S.valid(script))
             if not problems:
                 if isinstance(script, dict):
                     state["script_draft"] = script
