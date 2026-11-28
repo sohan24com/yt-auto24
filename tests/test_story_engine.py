@@ -55,6 +55,12 @@ class StoryBlueprintTests(unittest.TestCase):
         self.assertTrue(any("scene 5 progression interval" in issue
                             for issue in story.validate_timing(blueprint, durations)))
 
+    def test_concise_outro_is_not_checked_as_a_progression_interval(self):
+        blueprint = sample_blueprint()
+        durations = [scene["target_duration_seconds"] for scene in blueprint["scenes"]]
+        durations[-1] = 12.09
+        self.assertEqual([], story.validate_timing(blueprint, durations, max_total=660))
+
     def test_open_loop_without_later_payoff_is_rejected(self):
         blueprint = sample_blueprint()
         blueprint["scenes"][7]["pays_off"] = []
