@@ -61,6 +61,19 @@ class StoryBlueprintTests(unittest.TestCase):
         durations[-1] = 12.09
         self.assertEqual([], story.validate_timing(blueprint, durations, max_total=660))
 
+    def test_five_second_outro_meets_blueprint_and_actual_timing_minimum(self):
+        blueprint = sample_blueprint()
+        blueprint["scenes"][-1]["target_duration_seconds"] = 5
+        durations = [scene["target_duration_seconds"] for scene in blueprint["scenes"]]
+        self.assertFalse(any("outro scene" in issue for issue in story.validate_blueprint(blueprint)))
+        self.assertFalse(any("actual outro" in issue for issue in story.validate_timing(blueprint, durations)))
+
+    def test_outro_under_five_seconds_is_rejected(self):
+        blueprint = sample_blueprint()
+        durations = [scene["target_duration_seconds"] for scene in blueprint["scenes"]]
+        durations[-1] = 4.99
+        self.assertTrue(any("actual outro" in issue for issue in story.validate_timing(blueprint, durations)))
+
     def test_open_loop_without_later_payoff_is_rejected(self):
         blueprint = sample_blueprint()
         blueprint["scenes"][7]["pays_off"] = []
