@@ -1,0 +1,1239 @@
+{
+ "video_id": "QnqqV_IqEJE",
+ "url": "https://youtu.be/QnqqV_IqEJE",
+ "created": "2026-11-28T20:44:33.172330+00:00",
+ "job_id": "20261128-slot-1",
+ "day": 6,
+ "topic": "The Disappearance of the RMS Titan and Morgan Robertson's Novel",
+ "angle": "How did an 1898 fictional novella predict the exact specifications and tragic fate of the Titanic fourteen years before it struck an iceberg?",
+ "category": "mystery",
+ "title": "Examine the astonishing parallels between Morgan Robertson's fictional RMS Titan and the real RMS Ti",
+ "title_b": "Did an 1898 Book Predict the Titanic Sinking?",
+ "thumb_ids": [
+  "132Oj1XzNCIZKKrkb_R_pgEuOuLOoegf3",
+  "132Oj1XzNCIZKKrkb_R_pgEuOuLOoegf3",
+  "1IxVZ2iEq-d6oa962p9cPxaaDJ0Eyq_aK"
+ ],
+ "thumbnail_options": [
+  {
+   "drive_id": "132Oj1XzNCIZKKrkb_R_pgEuOuLOoegf3",
+   "score": 78,
+   "concept": "split_evidence"
+  },
+  {
+   "drive_id": "132Oj1XzNCIZKKrkb_R_pgEuOuLOoegf3",
+   "score": 78,
+   "concept": "dual_story"
+  },
+  {
+   "drive_id": "1IxVZ2iEq-d6oa962p9cPxaaDJ0Eyq_aK",
+   "score": 76,
+   "concept": "clean_frame"
+  }
+ ],
+ "drive_video_id": "1SJ0XwnGe-IC1HGDM8-XfZ8vMYDmtdYFz",
+ "asset_manifest_drive_id": "1LZSRShD0Xlvk53jYHFq-OHxL3ugX_f3c",
+ "story_blueprint_drive_id": "16eSMNHCGxanIZ9XLBw4TBt8JUvD5ziJS",
+ "story_quality": {
+  "score": 100,
+  "label": "story_structure_score",
+  "components": {
+   "hook": {
+    "earned": 15,
+    "possible": 15
+   },
+   "three_act_structure": {
+    "earned": 15,
+    "possible": 15
+   },
+   "retention_and_payoffs": {
+    "earned": 20,
+    "possible": 20
+   },
+   "evidence_links": {
+    "earned": 15,
+    "possible": 15
+   },
+   "storyboard_alignment": {
+    "earned": 20,
+    "possible": 20
+   },
+   "ending": {
+    "earned": 10,
+    "possible": 10
+   },
+   "originality": {
+    "earned": 5,
+    "possible": 5
+   }
+  },
+  "issues": []
+ },
+ "central_question": "How did an 1898 fictional novella predict the exact specifications and tragic fate of the Titanic fourteen years before it struck an iceberg?",
+ "title_promise": "Examine the astonishing parallels between Morgan Robertson's fictional RMS Titan and the real RMS Titanic through documented historical analysis.",
+ "asset_manifest": [
+  {
+   "asset_id": "pixabay-v80861",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-80861/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "ghost, face, scream, halloween, horror, fictional, movie, zombie, scary, spooky, mask, fear, horror movie, green screen, costume, fantasy, dead, evil, monster (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v9883",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-9883/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "book, study, education, learn, book cover, reading, brain, animation video (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v45132",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-45132/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "girl, young, woman, pose, face, model, female, person, beauty, portrait, smile (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v29239",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-29239/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "bretagne, man, woman, positive, stripes, sailor (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v23866",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-23866/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "marine, port, boat, trip, ship, city, sea, water, travelling (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v297570",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-297570/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "taormina, aerial photography, boat, harbor, bay, sailboat, yacht, sicily, colorful, vacations, travel photography, amphitheater, antique, resort, travel, italian, island, historic, mediterranean, nature, city landscape, summer, aerial view (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v80817",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-80817/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "hair, wind, girl, person, young, portrait (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v3713",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-3713/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "cruise ship, cruises, harbour, ship, sea, port, transport, coast, boat, vessel (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v228587",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-228587/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "grid, abstract, paper, technical, drawing, array, background (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v7128",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-7128/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "architecture, buildings, street, white, city (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v119944",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-119944/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "ship, black pearl, terror, explosion, ocean, fury, titanic, drilling, storm, hurricane, tornado (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v236893",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-236893/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "drone, landscape, green, greenland, iceberg, sea, arctic, ice, fjord, ship, polar, winter, cold, change, environment, earth (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v228586",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-228586/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "grid, abstract, paper, technical, drawing, array, background (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v31956",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-31956/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "dubai, skyline, architecture, skyscrapers, sky, downtown, emirates, clouds, uae, city, cityscape (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v360532",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-360532/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "ai generated, shipwreck, wreckage, coast, loop, skeleton, hull, ribs, abandoned, maritime, nautical, ruins, ocean, waves, sunset, wooden, remains, history, seascape, storm, decay, forgotten, timeless, sea (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v5730",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-5730/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "black swan, swan, watertight, animal, water, black, nature, peak, reflection, blue, elegance, bird, beauty, plumage, pond (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v33014",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-33014/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "port, yachts, water, sea, boat, marina, ship, regatta, sailboat, reflection, ships, sailing, summer, travel, drone, with drone, from above (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v358640",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-358640/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "storm, sea, loop, breakwater, nature, waves, ocean, lighthouse, jetty, seawall, surf, spray, weather, maritime, coast, shoreline, tempest, gale, water, harbor, engineering, swell, dramatic, turbulent, ai generated (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v14484",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-14484/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "cruise, ship, sea, travel, ocean, vacation, boat, cruise ship, water, holiday, luxury, tourism, sail, sky, nautical, passenger, summer, tropical, transportation, voyage, caribbean, vessel, liner, cruising, tourist, trip, journey, sunset, transport, yacht, sailing, blue, people, destination, port, relax, deck (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-p7571829",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/photos/caisson-hollow-gate-hull-watertight-7571829/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "caisson, hollow gate, hull, watertight, ship building, dry dock, engineering, geotechnical engineering, iron, hollow, harland and wolff, old, historical, titanic quarter (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v311",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-311/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "ship, ocean, sea, storm, pirates, sailing, waves, thunderstorm, lightning, boat, dangerous, force of nature, elements, nature, 135731672 (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v47615",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-47615/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "lagoon, glacier, iceland, landscape, iceberg, arctic, water, nature, blue, ice, cold, icebergs, frozen, lake, jokulsarlon, waters, vatnajokull, drone (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v103002",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-103002/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "ocean, sea, landscape, ship, fog, mountain, night, moon, dark, water, rock, stone (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v7098",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-7098/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "wave of fog, fog, foggy landscape, sea of fog, sea of clouds, mist flow, winter landscape, icy, winter, winter mood, idyll, law, eastern jura, swiss jura, boelchen, boelchenflue, swiss belchen, belchenflue (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v175352",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-175352/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "ship, cruise, seafaring, bow wave, lifeboat, boat, sea, water, waves, ocean, nature (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v10339",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-10339/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "milky way, heaven, starry sky, night, stars, evening sky, space, night sky (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v233772",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-233772/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "ocean, cloud, storm, sea, dark, sky, stormy, sun, water, cloudy, coastline, splashing, cloudscape, coast, wave, seascape (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v171255",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-171255/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "toucan, bird, tree, green, colorful bird, long-billed bird (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v270314",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-270314/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "data, technology, futuristic, network, communication, connection, global, internet, cyberspace, digital, information, science, innovation, future, business, analysis, big data, ai, artificial intelligence, ai generated (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v336159",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-336159/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "doctor, medical history, healthcare, patient records, vintage, stethoscope, old documents, medical practice, physician, historical medicine, antique, education, research, clinic, heritage, medicine evolution, classic, archival, professionalism, care, ai generated (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v9772",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-9772/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "file, folder, office, business, document, archive, file folder, bureaucracy, management, paper (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v6962",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-6962/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "stars, long exposure, starry sky, heaven, evening sky, landscape, mountains, evening atmosphere, universe, nature, alps, switzerland, gurnigel, gantric, timelaps, earth day (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v308076",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-308076/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "stock market, finance, trading, investment, economy, business, money, financial growth, market trends, data analysis, trading charts, stock exchange, wall street, forex, cryptocurrency, bitcoin, investor, business background, financial data, corporate, profit, economics, data visualization (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-p62897",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/photos/hole-kartenlocher-data-processing-62897/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "hole kartenlocher, data processing, punch cards, lochkartenstanzer, key punch, card punch, woman, work, data, records, data processing, punch cards, punch cards, punch cards, punch cards, punch cards, data, data, data (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v2849",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-2849/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "hong kong, cruise, harbour, transport, aerial video, ocean, ship (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v143857",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-143857/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "squirrel, eating, deck, nut, shells, animal (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v135658",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-135658/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "ocean, beach, sunset, sea, atmosphere, relaxing, relaxation, ocean waves, dream destination, 4k, golden sunset, nature (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v322476",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-322476/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "busan, south korea, port, harbor, fishing, boat, ship, maritime, industry, coastline, city, cityscape, urban, hillside, architecture, vintage, retro, 1980s, archival, water, dock, pier, hazy, overcast, asia, ai generated (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v6815",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-6815/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "flow, ship, eve, romantic, ferries, warnemünde, sunset, clouds, heaven, evening sky, sun, evening atmosphere, setting sun, afterglow, sea, time lapse (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v781",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-781/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "sunrise, beach, resort, hotel, ocean, sea, sun, water, coast, sand, summer, morning, relax, holiday, vacation, lifestyle, deck chairs, luxury, 136216758 (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v216313",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-216313/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "boats, harbor, aerial, aerial view, cargo, carrier, coast, containers, delivery, distribution, dock, goods, industry, international, port, ship, shipment, shipyard, southampton, terminal, transport, transportation, travel, uk, united kingdom (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v3985",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-3985/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "gantry crane, animation, 3d, robot technology, machine, industry, rendering, sequence, motion study, assembly, transport, logistics, 3d concept (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v156466",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-156466/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "river, bridge, han river, iron bridge, sky, mountain, reflections, sunset, dusk, republic of korea, drone, landscape (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v344232",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-344232/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "artificial intelligence, future technology, human-robot interaction, digital transformation, innovation concept, cyborg partnership, global connectivity, machine learning, robotics technology, hand reach, synergy, cybernetic link, virtual reality, communication, intelligence, industrial revolution, connection, automation, touch, blue, light, binary, network, person, close up, ai generated (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v1543",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-1543/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "century hall, bochum, one live, crown, art, culture, building, light, course of the day, sunrise, sunset, lighting, house, facade, architecture (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v219862",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-219862/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "birds, red-crowned cranes, cranes, plumage, feathers, wildlife (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v46308",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-46308/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "sunset, chain, iron, rust, nature, landscape, sky, daylight (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v87421",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-87421/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "boat, waves, the engine, ocean, water, movement, sea (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v32052",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-32052/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "ship, boat, sea, sail, ocean, travel, shipping, shipwreck, san francisco, blue, water, container, bridge, golden gate bridge (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v204007",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-204007/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "band, orchestra, group, acoustic, bass, brass, character, entertainment, festival, instruments, jazz, musical, musician, party, performance, performer, player, poster, sax, saxophone, trumpeter (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v51016",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-51016/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "cockpit, pilot, steering wheel, aircraft, flying, airport, aviation, jet, travel, traffic, panorama, nature (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v70960",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-70960/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "animated wallpaper, wallpaper, animated wallpapers, nature wallpaper, nature, nature video wallpaper, live wallpaper, beautiful nature wallpaper video, animated background, background video, wallpaper engine, video wallpaper, wallpaper engine best wallpapers, hd wallpaper nature video, animated backgrounds, beautiful animated wallpaper, wallpaper engine free, nature wallpapers, nature wallpaper hd, beautiful wallpaper, nature animated, best-animated wallpapers, nature wallpaper hd download, nature video (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v209901",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-209901/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "ship, sea, bridge, busan, island, south korea (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v5398",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-5398/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "news, newspaper, article, press, media, information, journalist, report, headline (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v42738",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-42738/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "titanic, ship, world, ocean, iceberg, available, metallic, mechanical, wheel, engineers, 1914 (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v1334",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-1334/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "typewriter top, typing, writing, author, book author, writer, pages, type, machine, font, print, printing, printmaking, vintage, old fashioned, composing (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v202537",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-202537/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "castle, germany, medieval, europe, historical, fortress, bavaria (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v8453",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-8453/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "turntable, old, vinyl, music, retro, entertainment, record, audio, sound, vintage, analog, label, track (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-p6972725",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/photos/titanic-sunset-ocean-ship-6972725/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "titanic, sunset, nature, ocean, ship, water vessel, sunrise, landscape (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v185096",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-185096/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "book, pages, literature, beach, ocean, education, reading, study, school, learning, poet, writer (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v125748",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-125748/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "house, village, mountains, nature, rainbow, butterfly (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v223632",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-223632/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "slider, display, analog, transition, film, technology, retro, dark, statistics, statistical, advertisement, effects, old, vintage, photos, frame, green screen (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v11254",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-11254/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "bookshelf, book, library, education, knowledge, literature, shelf, textbook, bookstore, read, bookcase, studying, row, hand, male, man, setting, putting back (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v185092",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-185092/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "book, wind, literature, education, writing, reading, poetry, novel, author (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v10685",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-10685/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "rooster, chicken, village, farm, polygamy, country house, family, bird, natural economy, animal husbandry (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v122232",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-122232/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "reading list at library, library, book, man, young, literary, read the book, read, learn, the student (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v54708",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-54708/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "handicraft, wood, tools, artisans, art, italy, venice, famous, construction, boats, historian (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v385462",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-385462/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "ai generated, chemistry, laboratory, experiment, scientist, chemist, bunsen burner, flask, boiling, flame, research, science, lab coat, safety goggles, notes, education, classroom, pharmaceutical, work, discovery, curiosity, precision, transformation, innovation, analysis (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v69480",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-69480/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "evaluation, analysis, magnifying glass, paper, document, audit, verification, report, business, data, review, assessment, researching, research, inspection, paperwork, motion graphics, analyzing, auditor, cartoon (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v122231",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-122231/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "reading list at library, library, book, man, young, literary, read the book, read, learn, the student (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v1028",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-1028/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "homework, girl, student, laptop, study, studying, notebook, work, fan, chair, desk, concentrated, concentrating, education, school, learning, reading, female, people, college (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v349087",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-349087/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "file, folder, document, cabinet, archive, spreadsheet, paper, law, libra, justice, weigh, judge, paragraph, balance (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v229327",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-229327/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "book, esoteric, fantasy, fingerprint, grunge, halloween, hand, handprint, library, manuscript, mystery, mystical, occult, occultism, omen, page, person, religion, retro, ritual, signature, spiritual, symbols, typewriter, vintage (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v846",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-846/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "library, books, the corridor, window, rack, the culture, reading, classic, new items, reading room, society, shelves, education, studies, school (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v37961",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-37961/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "scroll, parchment, old, parchment paper, paper, antique, certificate, document role (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v2775",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-2775/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "blue tit, bird box, bird house, garden, nest, mate, bird, box, wildlife, nature, spring, small, nesting, ornithology, songbird, birdwatching (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v28041",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-28041/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "story, editing, pen, story editing, editing a manuscript, manuscript, manuscript editing, manual editing, editing a novel, novel editing, writing a novel, sony cx405 (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v167688",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-167688/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "living room, windows, rain, raindrops, cozy, nature (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v12543",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-12543/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "sparkles, industry, worker, industrial, metal, steel, equipment, production, technology, factory, manufacture, welding, sparks, machine, iron, manufacturing, light, machinery, work, tool, fire, engineering, bright, shiny, energy, plant, modern, heavy, mechanical, plasma, working, burn, arc, electric, automobile (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v61621",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-61621/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "clock, alarm, desk, time, lapse, moving, watch, vintage, timer, steampunk, retro, gear, metal, gears, antique, machine (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v57046",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-57046/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "christmas, train, rails, railway, tracks, snow, snowflake, winter, december, locomotive, steam, engine, railroad, transportation, express, station, coal, caboose (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v148417",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-148417/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "gears, drive unit, mechanism, metal, mechanics, industry, production, factory (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v212001",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-212001/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "machine, gears, metal, old, wheel, industry, industrial, equipment, iron, rusty, antique, work, machinery, mechanism mechanism, architecture, vintage, construction, engine (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v12226",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-12226/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "earth, globe, turning, planet, hologram (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v74482",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-74482/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "hearts, love, marriage, love story, happiness, feelings, valentine, decoration, romantic (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v69573",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-69573/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "book, open, library, history, literature, text, studio, memory, school, high school, university, to write (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v236960",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-236960/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "ai generated, reading, female, quiet time, relax, indoor, calm, book, natural, library, healing, glasses, minimalist, homey, cosy, everyday happiness, vintage, relaxing time, hobby, casual fashion, soft writing (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v2802",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-2802/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "lava lamp, light, orange, lamp, 70's, silver, liquid, glass, retro, seventies, design, illumination, lavalamp, bubble, vintage, decoration, fluid, decor, home, blob, bright, sixties, illuminated, colourful, desk, cool, 1960's, decorate, yellow, psychadelic, style, hippie, hippy, studio, disco, 1970's, calming (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v50322",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-50322/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "overdose, overdosing, cpr, dying, dead, sad, lonely, help, crying, screaming, pills, medication, young, tragedy, tragic, suicidal, depression (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v26830",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-26830/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "underwater, seabed, light, rays, background, water, sunrays, sea, fish, ocean, depths, blue, nature, beautiful wallpaper, aquatic, calm, surface, live wallpaper (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v749",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-749/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "wreck diving, sunken, ship, wreck, ocean, shipwreck, marine, water, diving, underwater, aquatic, scuba, life, tropical fish, clear, seascape, scuba diving, wild, under the sea, blue, transparent, 136306473 (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v190901",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-190901/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "jellyfish, underwater, aquarium, sea, glow, exotic, medusa, ocean, deep, diving, seashore, animal, wildlife, wilderness, tentacles, poison, aquatic, translucent, bright, water, darkness, fauna (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v87951",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-87951/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "look, woman, spiral, both, surreal, eye (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v39393",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-39393/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "turtle, ocean, sun rays, depth, diving, flare, glow, rays, sea, shine, sun, turtles swimming, underwater, water, fish, blue, marine, aquatic, deep, meditation, relaxing, magical, peaceful, beautiful, tortoise (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v29494",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-29494/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "crusader garden, he did, spider, insect, quits, builder, hunter, animals, nature, outside, invertebrates, closeup, forest, arachnid, terrifying, hairy, color, beautiful, alive, autumn, environment, biology (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v21175",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-21175/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "ocean, horizon, yellow clouds, waves, sunset, sea, calm (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v189926",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-189926/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "sunset, flowers, roses, butterflies, dusk, dawn, sky, clouds, nature (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v19609",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-19609/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "ocean, waves, splash, sea front, spray, scenery, foam, coast, seascape, tourism, travel, nature, pier, scenic, sunset, calm, holiday (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v352505",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-352505/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "ai generated, horse, animal, mammal, equine, nature, mane, equestrian, stallion, morgan, breed, domestic, black, beautiful, galloping, running, field, prairie, farm, meadow (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v164101",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-164101/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "end screen, internet, youtube, digital, subscribe, network, button, social media (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  },
+  {
+   "asset_id": "pixabay-v302854",
+   "source": "Pixabay",
+   "source_url": "https://pixabay.com/videos/id-302854/",
+   "license": "Pixabay Content License",
+   "license_url": "https://pixabay.com/service/license/",
+   "license_status": "provider_terms",
+   "credit": "subscribe, button, icon, subscription, youtube, subscribe button, red subscribe, red color button, youtube bell icon, bell, notification, click subscribe, logo, social, red, white and red button, subscribe my channel, channel, subscribe bell icon, like, share icon, like icon, thumb, share, message (Pixabay; Pixabay Content License)",
+   "illustrative": true
+  }
+ ],
+ "fact_check": {
+  "status": "not_verified",
+  "claims": [],
+  "source_count": 0,
+  "warning": "Automated search evidence is unavailable or incomplete; review claims before publishing.",
+  "reason": "GeminiUnavailableError"
+ },
+ "duration": 456,
+ "short_id": "Iqx-_eYuUJ0",
+ "scenes": [
+  {
+   "title": "The Prophecy in Print",
+   "start": 0,
+   "duration": 4.814,
+   "narration": "A fictional sinking predicted the Titanic fourteen years early.",
+   "emotion": "Curiosity"
+  },
+  {
+   "title": "Morgan Robertson's World",
+   "start": 5,
+   "duration": 25.502,
+   "narration": "In eighteen ninety-eight, American author Morgan Robertson published a novella titled Futility. Robertson was not a mystic or a clairvoyant. He was a former merchant marine sailor turned struggling writer, intimately familiar with persistent design flaws, safety shortcomings, and sheer hubris of late nineteenth-century transatlantic passenger shipping companies operating across turbulent global waters.",
+   "emotion": "Calm"
+  },
+  {
+   "title": "The Specification Match",
+   "start": 30,
+   "duration": 36.182,
+   "narration": "At the center of Robertson’s story was the largest craft afloat, an indestructible marvel of modern engineering named the Titan. Consider the physical specifications. Robertson gave his fictional vessel a length of eight hundred feet, powered by twin screws, and capable of twenty-five knots. Fourteen years later, the White Star Line launched the Titanic, measuring eight hundred and eighty-two feet, driven by triple screws, and pushing twenty-four knots, creating a proportional scale that remains genuinely staggering to modern naval architects.",
+   "emotion": "Awe"
+  },
+  {
+   "title": "The Fatal Vulnerability",
+   "start": 66,
+   "duration": 29.846,
+   "narration": "More critical than mere dimensions was the structural philosophy shared by both ships. Both the Titan and the Titanic were built with watertight compartments that gave creators and the traveling public a false sense of absolute invulnerability against disaster. In both narratives, this technological hubris blinded operators to looming environmental perils of North Atlantic shipping lanes, particularly during peak ice seasons. This brings us to a pressing historical question.",
+   "emotion": "Caution"
+  },
+  {
+   "title": "The Fatal Night",
+   "start": 96,
+   "duration": 27.71,
+   "narration": "On an icy April night, under a calm, moonless sky, the fictional Titan struck an iceberg on her starboard bow while steaming too fast through dense North Atlantic fog. Fourteen years later, the exact same scenario played out in grim reality. The parallels extend beyond architecture into the chilling mechanics of the disaster itself, defying simple explanations of pure statistical chance and demanding deeper investigative scrutiny.",
+   "emotion": "Tension"
+  },
+  {
+   "title": "The Mathematical Improbability",
+   "start": 124,
+   "duration": 27.23,
+   "narration": "Statisticians have long examined these alignments and found them exceedingly rare across maritime history. How could a fictional construct match reality down to phonetic name similarity, gross tonnage, and impact speed? Skeptics argue observers remember hits and conveniently forget misses. Yet when we catalog secondary details, the list of matching anomalies grows far too long to dismiss as casual coincidence.",
+   "emotion": "Skeptical"
+  },
+  {
+   "title": "The Lifeboat Shortage",
+   "start": 151,
+   "duration": 28.142,
+   "narration": "Take, for instance, the critical matter of lifeboats. In Robertson’s novella, the fictional Titan carried only twenty-four lifeboats, less than half the number required for thousands of passengers on board. Robertson used this glaring deficiency to heighten narrative tragedy. In nineteen twelve, the real Titanic carried twenty lifeboats—enough for barely a third of souls aboard, driven by identical regulatory complacency.",
+   "emotion": "Outrage"
+  },
+  {
+   "title": "Unraveling the Naming Mystery",
+   "start": 179,
+   "duration": 30.926,
+   "narration": "We now return to our first open loop: Why did Robertson choose such specific dimensions? The answer lies in his deep professional immersion in contemporary naval architecture. Robertson was not pulling numbers from thin air; he was actively extrapolating the trajectory of shipbuilding trends in the eighteen nineties. Shipyards on both sides of the Atlantic were racing to build larger hulls, making his fictional specifications an educated projection of industrial ambition rather than pure magic.",
+   "emotion": "Enlightened"
+  },
+  {
+   "title": "The Speed and Ice Dynamic",
+   "start": 210,
+   "duration": 28.142,
+   "narration": "Consider also the immense pressure of commercial schedules. In both the novel and the historical tragedy, the drive for commercial speed outweighed navigational caution. Steamship companies competed fiercely for the Blue Riband, the informal accolade for the fastest North Atlantic crossing. Captains felt immense corporate pressure to maintain high velocities through known ice fields, a systemic flaw Robertson critiqued years before disaster struck.",
+   "emotion": "Tension"
+  },
+  {
+   "title": "The Public Reaction",
+   "start": 238,
+   "duration": 27.542,
+   "narration": "When the Titanic sank in April nineteen twelve, public astonishment was immediate and profound. But as readers dusted off copies of Robertson’s long-forgotten novella, astonishment turned into eerie disbelief. Newspapers published sensational side-by-side columns comparing the fictional wreck to the real-life catastrophe, propelling Robertson back into the public eye—though without yielding him the substantial financial reward he desperately desired.",
+   "emotion": "Surprise"
+  },
+  {
+   "title": "The Revision and Re-release",
+   "start": 266,
+   "duration": 27.086,
+   "narration": "Sensing a lucrative commercial opportunity in the wake of the tragedy, publishers rushed Futility back into print in nineteen twelve, reissuing it under the revised title The Wreck of the Titan. They updated promotional materials to emphasize uncanny prophecy, framing Robertson as a visionary psychic rather than an insightful maritime observer. Yet this commercial packaging masked a much deeper truth about human nature and industrial hubris.",
+   "emotion": "Cynical"
+  },
+  {
+   "title": "Analyzing the Skeptical View",
+   "start": 293,
+   "duration": 26.942,
+   "narration": "Historians and literary scholars have rigorously tested these alleged prophetic links over decades. They point out that several key operational details did not match. Robertson’s fictional Titan struck the iceberg during a storm at twenty-five knots and sank with immense loss of life primarily because of direct collision force, whereas the real Titanic grazed an iceberg on a calm night and sank because five forward compartments flooded sequentially.",
+   "emotion": "Thoughtful"
+  },
+  {
+   "title": "Addressing the Conspiracy",
+   "start": 320,
+   "duration": 26.966,
+   "narration": "This brings us to our second open loop: Did White Star Line designers read Robertson's work? Extensive archival reviews of Harland and Wolff shipyard records and White Star corporate correspondence yield zero evidence that Thomas Andrews or Bruce Ismay ever read Futility. The striking similarities arose not from plagiarism or industrial blueprint theft, but from shared assumptions deeply embedded within the global maritime community.",
+   "emotion": "Resolved"
+  },
+  {
+   "title": "The Convergence of Logic",
+   "start": 347,
+   "duration": 27.686,
+   "narration": "Both Robertson and engineers of the White Star Line operated under the exact same governing laws of physics, commercial economics, and naval engineering constraints. When you combine massive steel hulls with inadequate safety regulations and competitive speed pressures, the mathematical probability of a catastrophic North Atlantic collision approaches inevitability. The tragedy was entirely foreseeable because the system itself was structurally flawed.",
+   "emotion": "Analytical"
+  },
+  {
+   "title": "The True Meaning of the Prophecy",
+   "start": 375,
+   "duration": 20.918,
+   "narration": "Ultimately, the story of Morgan Robertson’s Titan is not a supernatural tale of precognition or magic. It stands as a testament to the power of human observation. Robertson looked at the dangerous trajectory of maritime technology and logically deduced its most hazardous conclusion years before it ever manifested in steel and ice.",
+   "emotion": "Wise"
+  },
+  {
+   "title": "Lessons Left Unheeded",
+   "start": 396,
+   "duration": 29.15,
+   "narration": "The tragic resonance of both the Titan and the Titanic lies in our persistent human tendency to mistake technological scale for absolute safety. Whenever humanity builds structures deemed too big to fail, we invite the very catastrophes we believe we have engineered our way out of. Robertson’s fiction served as a warning that went completely unheeded until icy waters of the Atlantic proved him devastatingly correct.",
+   "emotion": "Solemn"
+  },
+  {
+   "title": "The Final Verdict",
+   "start": 425,
+   "duration": 21.254,
+   "narration": "Morgan Robertson did not sink the Titanic from the pages of a book. Instead, he simply read the writing already etched onto the walls of every major shipyard in the world. His novella stands as a stark reminder that when human ambition outpaces caution, tragedy ceases to be mere fiction. The warning was clear.",
+   "emotion": "Satisfied"
+  },
+  {
+   "title": "Outro",
+   "start": 446,
+   "duration": 10.334,
+   "narration": "Thank you for watching. If this investigation fascinated you, please like, subscribe, and explore our featured maritime history playlist next.",
+   "emotion": "Appreciative"
+  }
+ ],
+ "fact_check_changes": [],
+ "swapped": false,
+ "snapshots": {},
+ "localized": [
+  "ar",
+  "bn",
+  "de",
+  "es",
+  "fr",
+  "hi",
+  "id",
+  "ja",
+  "pt",
+  "ru"
+ ],
+ "short_scene": "The Mathematical Improbability"
+}
