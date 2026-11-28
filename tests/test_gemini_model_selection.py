@@ -15,6 +15,7 @@ class GeminiModelSelectionTests(unittest.TestCase):
         common._GEMINI_MODEL_COUNTS.clear()
         common._GEMINI_MODEL_COUNTS_LOGGED = False
         common._GEMINI_TOTAL_CALLS = 0
+        common._GEMINI_LISTMODEL_CALLS = 0
         common._GEMINI_DISABLED_MODELS.clear()
         common._GEMINI_DISABLED_PAIRS.clear()
         common._GEMINI_429_KEYS_BY_MODEL.clear()
@@ -28,6 +29,7 @@ class GeminiModelSelectionTests(unittest.TestCase):
         common._GEMINI_MODEL_COUNTS.clear()
         common._GEMINI_MODEL_COUNTS_LOGGED = False
         common._GEMINI_TOTAL_CALLS = 0
+        common._GEMINI_LISTMODEL_CALLS = 0
         common._GEMINI_DISABLED_MODELS.clear()
         common._GEMINI_DISABLED_PAIRS.clear()
         common._GEMINI_429_KEYS_BY_MODEL.clear()
@@ -82,6 +84,7 @@ class GeminiModelSelectionTests(unittest.TestCase):
         ], general)
         self.assertEqual(["gemini-2.5-flash", "gemini-2.5-flash-lite"], grounding)
         self.assertEqual(3, get.call_count)
+        self.assertEqual(3, common._GEMINI_LISTMODEL_CALLS)
         self.assertEqual("key-one", get.call_args_list[0].kwargs["params"]["key"])
         self.assertEqual("key-two", get.call_args_list[1].kwargs["params"]["key"])
         self.assertEqual("page-two", get.call_args_list[2].kwargs["params"]["pageToken"])
@@ -173,6 +176,7 @@ class GeminiModelSelectionTests(unittest.TestCase):
 
         common._GEMINI_DISABLED_MODELS.clear()
         common._GEMINI_TOTAL_CALLS = 0
+        common._GEMINI_LISTMODEL_CALLS = 0
         common._GEMINI_MODEL_COUNTS.clear()
         responses = [
             self._generation_response(404, "not found"),
@@ -208,6 +212,7 @@ class GeminiModelSelectionTests(unittest.TestCase):
         common._GEMINI_DISABLED_MODELS.clear()
         common._GEMINI_429_KEYS_BY_MODEL.clear()
         common._GEMINI_TOTAL_CALLS = 0
+        common._GEMINI_LISTMODEL_CALLS = 0
         common._GEMINI_MODEL_COUNTS.clear()
         minute = self._generation_response(429, payload={
             "error": {"message": "quota per minute", "details": [
@@ -240,6 +245,7 @@ class GeminiModelSelectionTests(unittest.TestCase):
         common._GEMINI_DISABLED_MODELS.clear()
         common._GEMINI_429_KEYS_BY_MODEL.clear()
         common._GEMINI_TOTAL_CALLS = 0
+        common._GEMINI_LISTMODEL_CALLS = 0
         common._GEMINI_MODEL_COUNTS.clear()
         overload = self._generation_response(503, "busy")
         with patch.object(common, "env", side_effect=lambda name, required=False: keys.get(name, "")), \
