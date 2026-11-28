@@ -311,8 +311,8 @@ def validate_blueprint(blueprint, require_evidence=False):
         issues.append("hook: first sentence must be speakable in five seconds (max 12 words)")
     if re.search(r"\b(hello|hi everyone|welcome to|today we are going to|let's dive)\b", hook, re.I):
         issues.append("hook: greetings and channel intro are not allowed")
-    if not hook_scene.get("opens_loop"):
-        issues.append("retention: opening hook must create a specific question")
+    if not isinstance(hook_scene.get("opens_loop"), list) or not hook_scene.get("opens_loop"):
+        issues.append("retention: scene 1 field 'opens_loop' must be a non-empty list of registered loop IDs")
     promise_terms = _tokens(promise)
     if len(promise_terms & _tokens(hook)) < min(2, len(promise_terms)):
         issues.append("hook: opening narration does not support the title promise")
