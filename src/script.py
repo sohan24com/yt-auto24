@@ -183,7 +183,7 @@ SCENES:
         print("fact_check returned incomplete evidence; keeping original script")
     except Exception as e:
         reason = type(e).__name__
-        print("fact_check failed; keeping original script:", reason)
+        print("WARNING: fact_check failed; keeping original script:", reason)
     fallback = dict(script)
     fallback["_fact_check"] = evidence_record([], reason)
     return fallback
@@ -399,4 +399,5 @@ DESCRIPTION: {intro}
 Return JSON: {{"translations":{{"<code>":{{"title":"","description":""}}}}}}"""
     out = gemini(prompt, temperature=0.3).get("translations", {})
     return {k: v for k, v in out.items() if k in languages and v.get("title") and v.get("description")}
+
 
