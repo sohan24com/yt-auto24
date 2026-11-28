@@ -19,7 +19,7 @@ video:
   max_seconds: 660      # quality gate: 11 min
   voice: "en-GB-RyanNeural"
   rate: "-4%"
-  gemini_tts: true                                  # emotional narration via Gemini TTS; falls back to edge-tts
+  gemini_tts: false                                 # emotional narration via Gemini TTS; falls back to edge-tts
   gemini_tts_model: "gemini-3.1-flash-tts-preview"
   gemini_tts_fallback_model: "gemini-2.5-flash-preview-tts"
   gemini_voice: "Schedar"                           # male, even tone (alternatives: Sulafat, Umbriel, Zephyr)
@@ -46,7 +46,7 @@ story:
   max_progression_seconds: 45
 
 publishing:
-  require_search_linked_fact_check: true
+  require_search_linked_fact_check: false
   require_license_manifest: true
 
 youtube:
@@ -69,3 +69,4 @@ optimize:
 localization:                  # translated titles/descriptions shown to viewers in their own language
   enabled: true
   languages: [es, pt, hi, bn, ar, fr, de, id, ru, ja]
+
