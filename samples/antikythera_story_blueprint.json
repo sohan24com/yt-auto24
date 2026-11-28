@@ -669,7 +669,7 @@
         "music_mood": "warm outro",
         "transition": "Fade out."
       },
-      "target_duration_seconds": 25,
+      "target_duration_seconds": 18,
       "causal_link": "After the resolved answer, a short invitation connects this machine story to the next documentary.",
       "visual_anchor": "machine",
       "information_reveal": ""
