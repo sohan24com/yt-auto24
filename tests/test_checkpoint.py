@@ -8,6 +8,43 @@ from src import common, edit, footage, pipeline
 
 
 class CheckpointAndSafetyTests(unittest.TestCase):
+    def test_underlength_script_retry_asks_to_expand_instead_of_compress(self):
+        draft = {"scenes": [{"narration": "word " * 48}]}
+        feedback = pipeline._narration_budget_feedback(draft, {"words_min": 1150, "words_max": 1400})
+        self.assertIn("current 48", feedback)
+        self.assertIn("Add at least", feedback)
+        self.assertIn("Do not compress", feedback)
+        self.assertNotIn("Remove repeated exposition", feedback)
+
+    def test_overlength_script_retry_asks_for_evidence_preserving_compression(self):
+        draft = {"scenes": [{"narration": "word " * 1600}]}
+        feedback = pipeline._narration_budget_feedback(draft, {"words_min": 1150, "words_max": 1400})
+        self.assertIn("current 1600", feedback)
+        self.assertIn("Remove repeated exposition", feedback)
+        self.assertIn("preserving evidence", feedback)
+
+    def test_retry_feedback_uses_validator_word_count_for_incomplete_draft(self):
+        feedback = pipeline._narration_budget_feedback({},
+            {"words_min": 1150, "words_max": 1400}, reported_count=872)
+        self.assertIn("current 872", feedback)
+        self.assertIn("Add at least 163", feedback)
+        self.assertIn("Do not compress", feedback)
+
+    def test_interrupted_script_retry_persists_invalid_draft_and_feedback(self):
+        draft = {"title_promise": "A documented mystery", "scenes": [{"narration": "draft text"}]}
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch("src.pipeline.cfg", return_value={"video": {"words_min": 1150, "words_max": 1400}}), \
+             patch("src.pipeline.F.reset"), \
+             patch("src.pipeline.T.choose_topic", return_value={"topic": "A topic", "angle": "A question"}), \
+             patch("src.pipeline.S.write_script", side_effect=[draft, RuntimeError("free quota exhausted")]) as write, \
+             patch("src.pipeline.S.valid", return_value=["word count 872"]):
+            with self.assertRaisesRegex(RuntimeError, "free quota exhausted"):
+                pipeline.build_once(tmp)
+            saved = pipeline._load_state(tmp)
+            self.assertEqual(draft, saved.get("script_draft"), saved)
+            self.assertTrue(any("Add at least 163" in item for item in saved["script_feedback"]))
+            self.assertEqual(draft, write.call_args_list[1].kwargs["previous_draft"])
+
     def test_checkpoint_round_trip_and_atomic_replace(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = {"version": pipeline.CHECKPOINT_VERSION, "stage": "voice", "durations": [3.2]}
@@ -171,7 +208,8 @@ class CheckpointAndSafetyTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "word count 1795"):
                 pipeline.build_once(tmp)
         feedback = write_script.call_args_list[1].kwargs["validation_feedback"]
-        self.assertTrue(any("target 1275 words" in issue and "hard maximum 1400" in issue
+        self.assertTrue(any("current 1795" in issue and "target 1275" in issue
+                            and "hard maximum 1400" in issue
                             for issue in feedback))
 
     def test_identical_provider_download_is_not_counted_as_distinct_footage(self):

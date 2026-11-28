@@ -93,6 +93,26 @@ def gate(final, total, reuse, asset_manifest=None):
             bad.append(f"asset license URL is missing: {label}")
     return bad
 
+
+def _narration_budget_feedback(script, limits, reported_count=None):
+    """Give the retry prompt a corrective instruction that matches the deficit."""
+    current = (int(reported_count) if reported_count is not None else
+               S.words(script.get("scenes", [])) if isinstance(script, dict) else 0)
+    target = (int(limits["words_min"]) + int(limits["words_max"])) // 2
+    minimum = int(limits["words_min"] * 0.9)
+    if current < minimum:
+        return (
+            f"Narration budget is under length: current {current}; minimum {minimum}; target {target}. "
+            f"Add at least {minimum - current} substantive, evidence-supported words across scenes 2-17. "
+            "Expand context, evidence, consequences, and causal links; preserve the short opening and outro. "
+            "Do not compress."
+        )
+    return (
+        f"Narration budget is over length: current {current}; target {target}; "
+        f"hard maximum {limits['words_max']}. Remove repeated exposition and decorative filler across scenes "
+        "while preserving evidence, causality, uncertainty, and payoffs."
+    )
+
 def build_once(wd, validation_feedback=None):
     wd = Path(wd)
     state = _load_state(wd)
@@ -104,6 +124,8 @@ def build_once(wd, validation_feedback=None):
     script = None
     problems = list(validation_feedback or [])
     script = state.get("script")
+    if not isinstance(script, dict):
+        script = state.get("script_draft")
     if not isinstance(script, dict) or S.valid(script) or validation_feedback:
         if validation_feedback:
             state.pop("geometry", None)
@@ -111,26 +133,48 @@ def build_once(wd, validation_feedback=None):
             state.pop("voice", None)
             for artifact in ("voice.wav", "final.mp4", "audio_report.json", "subs.ass"):
                 (wd / artifact).unlink(missing_ok=True)
-        for attempt in range(1, 4):
-            script = S.write_script(topic, validation_feedback=problems)
-            problems = S.valid(script)
+        previous_draft = state.get("script_draft")
+        if not isinstance(previous_draft, dict):
+            previous_draft = script if isinstance(script, dict) else None
+        problems = list(state.get("script_feedback") or validation_feedback or [])
+        max_attempts = 5
+        for attempt in range(1, max_attempts + 1):
+            script = S.write_script(topic, validation_feedback=problems,
+                                    previous_draft=previous_draft)
+            problems = list(S.valid(script))
             if not problems:
+                if isinstance(script, dict):
+                    state["script_draft"] = script
+                    state["script_feedback"] = []
+                    _save_state(wd, state)
                 break
-            print(f"script rejected (draft {attempt}/3):", problems)
+            print(f"script rejected (draft {attempt}/{max_attempts}):", problems)
+            previous_draft = script if isinstance(script, dict) else None
             limits = cfg()["video"]
-            if any(str(issue).startswith("word count ") for issue in problems):
-                problems.append(
-                    f"Narration budget: target {(int(limits['words_min']) + int(limits['words_max'])) // 2} words; "
-                    f"hard maximum {limits['words_max']}. Compress repeated exposition across all scenes."
-                )
+            word_count_issue = next((str(issue) for issue in problems
+                                     if str(issue).startswith("word count ")), None)
+            if word_count_issue:
+                try:
+                    reported_count = int(word_count_issue.split()[2])
+                except (IndexError, ValueError):
+                    reported_count = None
+                problems.append(_narration_budget_feedback(script, limits, reported_count))
+            if isinstance(script, dict):
+                state["script_draft"] = script
+                state["script_feedback"] = list(problems)
+                _save_state(wd, state)
         else:
             raise RuntimeError(f"could not produce a valid script: {problems}")
         checked = S.fact_check(script)
         checked = STORY.preserve_planning(script, checked)
+        checked = STORY.align_visual_anchors(checked)
+        checked = STORY.reconcile_loop_references(checked)
         for k in ("setting", "wiki_terms", "hook_text"):
             checked[k] = script.get(k, checked.get(k))
         checked = STORY.attach_evidence(checked, checked.get("_fact_check", {}))
         script = checked
+        state.pop("script_draft", None)
+        state.pop("script_feedback", None)
         state["script"] = script
         _save_state(wd, state)
     checked = script

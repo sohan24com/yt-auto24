@@ -43,6 +43,164 @@ def _scene_map(blueprint):
     return result
 
 
+def normalize_act_labels(blueprint):
+    """Repair only scene act numbers when a complete act outline is authoritative.
+
+    The act outline contains the explicit scene-to-act mapping. If it covers each
+    numbered scene exactly once, stale or malformed per-scene labels are safe to
+    derive from it; incomplete outlines are left untouched for validation.
+    """
+    if not isinstance(blueprint, dict) or not isinstance(blueprint.get("scenes"), list):
+        return blueprint
+    scenes = blueprint["scenes"]
+    acts = blueprint.get("acts")
+    if not isinstance(acts, list) or len(acts) != 3:
+        return blueprint
+    scene_map = _scene_map({"scenes": scenes})
+    if len(scene_map) != len(scenes) or set(scene_map) != set(range(1, len(scenes) + 1)):
+        return blueprint
+    expected = {}
+    try:
+        for act_number, act in enumerate(acts, 1):
+            if not isinstance(act, dict) or not isinstance(act.get("scene_numbers"), list):
+                return blueprint
+            for number in act["scene_numbers"]:
+                number = int(number)
+                if number in expected or number not in scene_map:
+                    return blueprint
+                expected[number] = act_number
+    except (TypeError, ValueError):
+        return blueprint
+    if set(expected) != set(scene_map):
+        return blueprint
+    result = dict(blueprint)
+    result["scenes"] = [
+        {**scene, "act": expected[index]} if isinstance(scene, dict) else scene
+        for index, scene in enumerate(scenes, 1)
+    ]
+    return result
+
+
+def align_visual_anchors(blueprint):
+    """Align planned scene visuals to narrated terms without asserting authenticity."""
+    if not isinstance(blueprint, dict) or not isinstance(blueprint.get("scenes"), list):
+        return blueprint
+    result = dict(blueprint)
+    scenes = []
+    for original in blueprint["scenes"]:
+        if not isinstance(original, dict):
+            scenes.append(original)
+            continue
+        scene = dict(original)
+        plan = dict(scene.get("visual_plan")) if isinstance(scene.get("visual_plan"), dict) else {}
+        raw_keywords = plan.get("footage_keywords", [])
+        keywords = list(raw_keywords) if isinstance(raw_keywords, list) else []
+        narration = str(scene.get("narration", ""))
+        ordered = [word.lower() for word in re.findall(r"[A-Za-z0-9']+", narration)
+                   if len(word) > 2 and word.lower() not in STOP]
+        narration_terms = set(ordered)
+        visual_text = " ".join((str(plan.get("description", "")), " ".join(map(str, keywords))))
+        shared = narration_terms & _tokens(visual_text)
+        if not shared:
+            options = scene.get("visuals", [])
+            matches = []
+            if isinstance(options, list):
+                for phrase in options:
+                    terms = narration_terms & _tokens(phrase)
+                    if terms:
+                        matches.append((len(terms), str(phrase), terms))
+            if matches:
+                _, phrase, shared = max(matches, key=lambda row: (row[0], row[1]))
+                description = str(plan.get("description", "")).strip()
+                if phrase.casefold() not in description.casefold():
+                    plan["description"] = (description + " | visual target: " + phrase).strip(" |")
+                for word in re.findall(r"[A-Za-z0-9'-]+", phrase):
+                    if word.lower() in shared and word not in keywords:
+                        keywords.append(word)
+            else:
+                # A narration-derived suggestion is explicitly illustrative; no new factual claim.
+                verbs = {"about", "after", "before", "become", "became", "change", "changed",
+                         "explain", "explains", "find", "finds", "found", "show", "shows", "tell",
+                         "tells", "think", "use", "used", "using", "make", "made", "create",
+                         "created", "discover", "discovers", "reveals", "according", "perhaps",
+                         "likely", "might", "could", "would", "therefore", "however"}
+                chosen = []
+                for word in ordered:
+                    if word not in verbs and word not in chosen:
+                        chosen.append(word)
+                    if len(chosen) == 3:
+                        break
+                if chosen:
+                    phrase = " ".join(chosen)
+                    description = str(plan.get("description", "")).strip()
+                    plan["description"] = (description +
+                        " | illustrative, narration-derived visual target: " + phrase).strip(" |")
+                    keywords.extend(word for word in chosen if word not in keywords)
+                    options = scene.get("visuals", [])
+                    options = list(options) if isinstance(options, list) else []
+                    if not any(phrase.casefold() == str(value).strip().casefold() for value in options):
+                        scene["visuals"] = [phrase, *options[:3]]
+                    shared = set(chosen)
+        plan["footage_keywords"] = keywords[:8]
+        anchor = _tokens(scene.get("visual_anchor", ""))
+        if shared and (not anchor or not anchor <= shared):
+            anchor_words = []
+            for word in ordered:
+                if word in shared and word not in anchor_words:
+                    anchor_words.append(word)
+                if len(anchor_words) == 3:
+                    break
+            scene["visual_anchor"] = " ".join(anchor_words)
+        scene["visual_plan"] = plan
+        scenes.append(scene)
+    result["scenes"] = scenes
+    return result
+
+
+def reconcile_loop_references(blueprint):
+    """Reconcile declared loop locations only from explicit scene markers."""
+    if not isinstance(blueprint, dict) or not isinstance(blueprint.get("scenes"), list):
+        return blueprint
+    result = dict(blueprint)
+    scenes = [dict(scene) if isinstance(scene, dict) else scene for scene in blueprint["scenes"]]
+    result["scenes"] = scenes
+    scene_map = _scene_map(result)
+    loops = result.get("open_loops")
+    if not isinstance(loops, list):
+        return result
+    normalized = []
+    for original in loops:
+        if not isinstance(original, dict):
+            normalized.append(original)
+            continue
+        loop = dict(original)
+        loop_id = str(loop.get("id", "")).strip()
+        try:
+            opened = int(loop.get("opened_scene"))
+        except (TypeError, ValueError):
+            normalized.append(loop)
+            continue
+        opening_markers = sorted(number for number, scene in scene_map.items()
+                                 if loop_id in (scene.get("opens_loop") or []))
+        if opening_markers:
+            opened = opening_markers[0]
+            loop["opened_scene"] = opened
+            for number, scene in scene_map.items():
+                markers = scene.get("opens_loop") or []
+                scene["opens_loop"] = [item for item in markers if item != loop_id or number == opened]
+        payoff_markers = sorted(number for number, scene in scene_map.items()
+                                if number > opened and loop_id in (scene.get("pays_off") or []))
+        if payoff_markers:
+            loop["payoff_scene"] = payoff_markers[0]
+            for number, scene in scene_map.items():
+                markers = scene.get("pays_off") or []
+                scene["pays_off"] = [item for item in markers
+                                      if item != loop_id or number == payoff_markers[0]]
+        normalized.append(loop)
+    result["open_loops"] = normalized
+    return result
+
+
 def evidence_dossier(record):
     """Convert Phase 2 evidence rows to stable IDs consumable by scene plans."""
     rows = record.get("claims", []) if isinstance(record, dict) else []
@@ -222,7 +380,8 @@ def validate_blueprint(blueprint, require_evidence=False):
     repetitions = []
     for number, scene in scene_map.items():
         narration = str(scene.get("narration", "")).strip()
-        if len(narration.split()) < 8:
+        minimum_words = 6 if number == 1 else 8
+        if len(narration.split()) < minimum_words:
             issues.append(f"story: scene {number} narration is too short to advance the story")
         if not scene.get("story_purpose") or not scene.get("story_progress") or not scene.get("causal_link"):
             issues.append(f"story: scene {number} needs purpose, progression, and a cause/effect link")
